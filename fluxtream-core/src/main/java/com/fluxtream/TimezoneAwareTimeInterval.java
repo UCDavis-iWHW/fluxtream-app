@@ -52,4 +52,28 @@ public class TimezoneAwareTimeInterval implements TimeInterval {
     public TimeZone getTimeZone(final String date) throws OutsideTimeBoundariesException {
         return consensusTimezones.get(date);
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof TimezoneAwareTimeInterval))
+            return false;
+        TimezoneAwareTimeInterval timeInterval = (TimezoneAwareTimeInterval) o;
+        if (timeInterval.getTimeUnit()!=getTimeUnit()) return false;
+        final boolean b = timeInterval.getStart() == getStart() && timeInterval.getEnd() == getEnd();
+        if (!b) return false;
+        final boolean b1 = timeInterval.timezoneMap.equals(timezoneMap);
+        if (!b1) return false;
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 1;
+        hash = hash * 37 + getTimeUnit().ordinal();
+        hash = hash * 37 + (int)(start ^ (start >>> 32));
+        hash = hash * 37 + (int)(end ^ (end >>> 32));
+        hash = hash * 37 + timezoneMap.hashCode();
+        return hash;
+    }
+
 }

@@ -15,6 +15,7 @@ import com.fluxtream.services.ApiDataService;
 import com.fluxtream.services.ConnectorUpdateService;
 import com.fluxtream.services.GuestService;
 import com.fluxtream.services.SystemService;
+import com.fluxtream.utils.CacheManagerProxy;
 import com.newrelic.api.agent.NewRelic;
 import com.newrelic.api.agent.Trace;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +47,9 @@ class UpdateWorker implements Runnable {
 
 	@Autowired
 	Configuration env;
+
+    @Autowired
+    CacheManagerProxy cacheManager;
 
 	UpdateWorkerTask task;
 
@@ -142,7 +146,7 @@ class UpdateWorker implements Runnable {
 			UpdateInfo updateInfo = UpdateInfo.pushTriggeredUpdateInfo(apiKey,
 					task.objectTypes, task.jsonParams);
 			UpdateResult updateResult = updater.updateData(updateInfo);
-			handleUpdateResult(apiKey, updateResult);
+			handleUpdateResult(apiKey, updateInfo, updateResult);
 		} catch (Throwable e) {
 			String stackTrace = stackTrace(e);
 			logger.warn("module=updateQueue component=worker action=pushTriggeredUpdate " +
@@ -162,7 +166,7 @@ class UpdateWorker implements Runnable {
         UpdateInfo updateInfo = UpdateInfo.initialHistoryUpdateInfo(apiKey,
                 task.objectTypes);
         UpdateResult updateResult = updater.updateDataHistory(updateInfo);
-        handleUpdateResult(apiKey, updateResult);
+        handleUpdateResult(apiKey, updateInfo, updateResult);
 	}
 
     private void updateData(final ApiKey apiKey, final AbstractUpdater updater) {
@@ -172,11 +176,10 @@ class UpdateWorker implements Runnable {
                     " connector=" + apiKey.getConnector().getName() + " guestId=" + apiKey.getGuestId());
         UpdateInfo updateInfo = UpdateInfo.IncrementalUpdateInfo(apiKey, task.objectTypes);
         UpdateResult result = updater.updateData(updateInfo);
-        handleUpdateResult(apiKey, result);
+        handleUpdateResult(apiKey, updateInfo, result);
     }
 
-	private void handleUpdateResult(ApiKey apiKey,
-			UpdateResult updateResult) {
+	private void handleUpdateResult(ApiKey apiKey, final UpdateInfo updateInfo, UpdateResult updateResult) {
 		switch (updateResult.getType()) {
 		case DUPLICATE_UPDATE:
 			duplicateUpdate();
@@ -185,9 +188,11 @@ class UpdateWorker implements Runnable {
             final UpdateWorkerTask.AuditTrailEntry rateLimit = new UpdateWorkerTask.AuditTrailEntry(new Date(), updateResult.getType().toString(), "long reschedule");
             rateLimit.stackTrace = updateResult.stackTrace;
 			rescheduleAccordingToQuotaSpecifications(apiKey, rateLimit);
+            cacheManager.invalidateFacets(apiKey.getConnector(), apiKey.getId(), updateInfo.objectTypes);
 			break;
 		case UPDATE_SUCCEEDED:
 			success(apiKey);
+            cacheManager.invalidateFacets(apiKey.getConnector(), apiKey.getId(), updateInfo.objectTypes);
 			break;
 		case UPDATE_FAILED:
         case UPDATE_FAILED_PERMANENTLY:

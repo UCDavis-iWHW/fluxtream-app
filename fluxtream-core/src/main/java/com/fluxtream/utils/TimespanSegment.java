@@ -85,4 +85,22 @@ public class TimespanSegment<T> implements Comparable<TimespanSegment>{
         System.out.println(london.getRawOffset()==dublin.getRawOffset());
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (! (o instanceof TimespanSegment))
+            return false;
+        TimespanSegment next = (TimespanSegment)o;
+        return next.getStart()==getStart()&&
+               next.getEnd()==getEnd()&&
+               next.getValue().equals(getValue());
+    }
+
+    public int hashCode() {
+        int hash = 1;
+        hash = hash * 37 + (int)(getStart() ^ (getStart() >>> 32));
+        hash = hash * 37 + (int)(getEnd() ^ (getEnd() >>> 32));
+        hash = hash * 37 + getValue().hashCode();
+        return hash;
+    }
+
 }

@@ -1,6 +1,7 @@
 package com.fluxtream;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.TreeMap;
@@ -27,6 +28,28 @@ public class TimezoneMap {
     public TreeSet<TimespanSegment<DateTimeZone>> spans = new TreeSet<TimespanSegment<DateTimeZone>>();
 
     public TimezoneMap() {
+    }
+
+    public int hashCode() {
+        int hash = 1;
+        for (TimespanSegment<DateTimeZone> span : spans)
+            hash = hash * 37 + span.hashCode();
+        return hash;
+    }
+
+    public boolean equals(Object o) {
+        if (!(o instanceof TimezoneMap)) return false;
+        TimezoneMap other = (TimezoneMap) o;
+        if (spans.size()!=other.spans.size()) return false;
+        final Iterator<TimespanSegment<DateTimeZone>> ourSpans = spans.iterator();
+        final Iterator<TimespanSegment<DateTimeZone>> otherSpans = other.spans.iterator();
+        while(ourSpans.hasNext()) {
+            final TimespanSegment<DateTimeZone> next = ourSpans.next();
+            final TimespanSegment<DateTimeZone> otherNext = otherSpans.next();
+            if (!next.equals(otherNext))
+                return false;
+        }
+        return true;
     }
 
     public boolean add(final long start, final long end, org.joda.time.DateTimeZone tz) {

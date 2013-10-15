@@ -61,6 +61,7 @@ import com.fluxtream.services.GuestService;
 import com.fluxtream.services.MetadataService;
 import com.fluxtream.services.NotificationsService;
 import com.fluxtream.services.SettingsService;
+import com.fluxtream.utils.CacheManagerProxy;
 import com.fluxtream.utils.Utils;
 import com.google.gson.Gson;
 import com.luckycatlabs.sunrisesunset.SunriseSunsetCalculator;
@@ -102,6 +103,9 @@ public class CalendarDataStore {
 
     @Autowired
     Configuration env;
+
+    @Autowired
+    CacheManagerProxy cacheManager;
 
     protected static final DateTimeFormatter formatter = DateTimeFormat
             .forPattern("yyyy-MM-dd");
@@ -154,8 +158,7 @@ public class CalendarDataStore {
 
             Map<Long,Object> connectorSettings = new HashMap<Long,Object>();
 
-            setCachedData(digest, allApiKeys, settings, connectorSettings, apiKeySelection,
-                          weekMetadata);
+            addFacetVOs(digest, allApiKeys, settings, connectorSettings, apiKeySelection, weekMetadata);
 
             setNotifications(digest, AuthHelper.getGuestId());
             setCurrentAddress(digest, guestId, weekMetadata.start);
@@ -225,8 +228,7 @@ public class CalendarDataStore {
             GuestSettings settings = settingsService.getSettings(AuthHelper.getGuestId());
 
             Map<Long,Object> connectorSettings = new HashMap<Long,Object>();
-            setCachedData(digest, allApiKeys, settings, connectorSettings, apiKeySelection,
-                          monthMetadata);
+            addFacetVOs(digest, allApiKeys, settings, connectorSettings, apiKeySelection, monthMetadata);
 
             setNotifications(digest, AuthHelper.getGuestId());
             setCurrentAddress(digest, guestId, monthMetadata.start);
@@ -353,8 +355,7 @@ public class CalendarDataStore {
             GuestSettings settings = settingsService.getSettings(AuthHelper.getGuestId());
 
             Map<Long,Object> connectorSettings = new HashMap<Long,Object>();
-            setCachedData(digest, allApiKeys, settings, connectorSettings, apiKeySelection,
-                    dayMetadata);
+            addFacetVOs(digest, allApiKeys, settings, connectorSettings, apiKeySelection, dayMetadata);
 
             setNotifications(digest, AuthHelper.getGuestId());
             setCurrentAddress(digest, guestId, dayMetadata.start);
@@ -467,7 +468,7 @@ public class CalendarDataStore {
 	}
 
 	@SuppressWarnings("rawtypes")
-	private void setCachedData(DigestModel digest, List<ApiKey> userKeys, GuestSettings settings, final Map<Long, Object> connectorSettings, List<ApiKey> apiKeySelection, AbstractTimespanMetadata timespanMetadata)
+	private void addFacetVOs(DigestModel digest, List<ApiKey> userKeys, GuestSettings settings, final Map<Long, Object> connectorSettings, List<ApiKey> apiKeySelection, AbstractTimespanMetadata timespanMetadata)
             throws InstantiationException, IllegalAccessException, ClassNotFoundException, OutsideTimeBoundariesException, UpdateFailedException
     {
 		for (ApiKey apiKey : userKeys) {
@@ -483,14 +484,26 @@ public class CalendarDataStore {
                         facetCollection = getFacetVos(timespanMetadata, settings, connector, objectType);
                         facetCollection.addAll(getFacetVOs(timespanMetadata, settings, connector, objectType, timespanMetadata.getTimeInterval()));
                     }
-                    else if (objectType.isDateBased())
-                        facetCollection = getFacetVos(toDates(timespanMetadata),
-                                                      settings,
-                                                      connector,
-                                                      objectType,
-                                                      timespanMetadata.getTimeInterval());
-                    else
-                        facetCollection = getFacetVos(timespanMetadata, settings, connector, objectType);
+                    else if (objectType.isDateBased()) {
+                        final List<String> dates = toDates(timespanMetadata);
+                        final Collection<AbstractFacetVO<AbstractFacet>> cachedVOs = cacheManager.getFacets(apiKey.getId(), objectType, dates);
+                        if (cachedVOs==null) {
+                            facetCollection = getFacetVos(dates,
+                                                          settings,
+                                                          connector,
+                                                          objectType,
+                                                          timespanMetadata.getTimeInterval());
+                            cacheManager.cacheFacets(apiKey.getId(), objectType, facetCollection, dates);
+                        } else
+                            facetCollection = cachedVOs;
+                    } else {
+                        final Collection<AbstractFacetVO<AbstractFacet>> cachedVOs = cacheManager.getFacets(apiKey.getId(), objectType, timespanMetadata.getTimeInterval());
+                        if (cachedVOs==null) {
+                            facetCollection = getFacetVos(timespanMetadata, settings, connector, objectType);
+                            cacheManager.cacheFacets(apiKey.getId(), objectType, facetCollection, timespanMetadata.getTimeInterval());
+                        } else
+                            facetCollection = cachedVOs;
+                    }
 
                     setFilterInfo(digest, apiKeySelection, apiKey,
                                   connector, objectType, facetCollection);
