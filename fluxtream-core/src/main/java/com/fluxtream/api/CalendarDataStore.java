@@ -493,14 +493,14 @@ public class CalendarDataStore {
                                                           connector,
                                                           objectType,
                                                           timespanMetadata.getTimeInterval());
-                            cacheManager.cacheFacets(apiKey.getId(), objectType, facetCollection, dates);
+                            cacheManager.cacheFacets(apiKey, objectType, facetCollection, dates);
                         } else
                             facetCollection = cachedVOs;
                     } else {
                         final Collection<AbstractFacetVO<AbstractFacet>> cachedVOs = cacheManager.getFacets(apiKey.getId(), objectType, timespanMetadata.getTimeInterval());
                         if (cachedVOs==null) {
                             facetCollection = getFacetVos(timespanMetadata, settings, connector, objectType);
-                            cacheManager.cacheFacets(apiKey.getId(), objectType, facetCollection, timespanMetadata.getTimeInterval());
+                            cacheManager.cacheFacets(apiKey, objectType, facetCollection, timespanMetadata.getTimeInterval());
                         } else
                             facetCollection = cachedVOs;
                     }
