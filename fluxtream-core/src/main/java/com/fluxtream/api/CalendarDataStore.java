@@ -486,7 +486,7 @@ public class CalendarDataStore {
                     }
                     else if (objectType.isDateBased()) {
                         final List<String> dates = toDates(timespanMetadata);
-                        final Collection<AbstractFacetVO<AbstractFacet>> cachedVOs = cacheManager.getFacets(apiKey.getId(), objectType, dates);
+                        final Collection<AbstractFacetVO<AbstractFacet>> cachedVOs = cacheManager.getFacets(apiKey, objectType, dates);
                         if (cachedVOs==null) {
                             facetCollection = getFacetVos(dates,
                                                           settings,
@@ -497,7 +497,7 @@ public class CalendarDataStore {
                         } else
                             facetCollection = cachedVOs;
                     } else {
-                        final Collection<AbstractFacetVO<AbstractFacet>> cachedVOs = cacheManager.getFacets(apiKey.getId(), objectType, timespanMetadata.getTimeInterval());
+                        final Collection<AbstractFacetVO<AbstractFacet>> cachedVOs = cacheManager.getFacets(apiKey, objectType, timespanMetadata.getTimeInterval());
                         if (cachedVOs==null) {
                             facetCollection = getFacetVos(timespanMetadata, settings, connector, objectType);
                             cacheManager.cacheFacets(apiKey, objectType, facetCollection, timespanMetadata.getTimeInterval());

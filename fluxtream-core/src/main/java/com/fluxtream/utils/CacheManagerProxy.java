@@ -9,7 +9,6 @@ import com.fluxtream.connectors.vos.AbstractFacetVO;
 import com.fluxtream.domain.AbstractFacet;
 import com.fluxtream.domain.ApiKey;
 import com.fluxtream.services.GuestService;
-import com.fluxtream.utils.caching.CachedValueObjects;
 import com.fluxtream.utils.caching.DatesCacheKey;
 import com.fluxtream.utils.caching.TimeIntervalCacheKey;
 import net.sf.ehcache.Cache;
@@ -50,10 +49,10 @@ public class CacheManagerProxy {
             Searchable searchable = new Searchable();
             cacheCfg.addSearchable(searchable);
 
-            searchable.addSearchAttribute(new SearchAttribute().name("apiKeyId").expression("value.apiKeyId"));
-            searchable.addSearchAttribute(new SearchAttribute().name("guestId").expression("value.guestId"));
-            searchable.addSearchAttribute(new SearchAttribute().name("api").expression("value.api"));
-            searchable.addSearchAttribute(new SearchAttribute().name("objectTypeValue").expression("value.objectTypeValue"));
+            searchable.addSearchAttribute(new SearchAttribute().name("apiKeyId").expression("key.apiKeyId"));
+            searchable.addSearchAttribute(new SearchAttribute().name("guestId").expression("key.guestId"));
+            searchable.addSearchAttribute(new SearchAttribute().name("api").expression("key.api"));
+            searchable.addSearchAttribute(new SearchAttribute().name("objectTypeValue").expression("key.objectTypeValue"));
 
             cache = new Cache(cacheCfg);
             cacheManager.addCache(cache);
@@ -61,35 +60,33 @@ public class CacheManagerProxy {
         return cache;
     }
 
-    public Collection<AbstractFacetVO<AbstractFacet>> getFacets(long apiKeyId, ObjectType objectType, TimeInterval timeInterval) {
+    public Collection<AbstractFacetVO<AbstractFacet>> getFacets(ApiKey apiKey, ObjectType objectType, TimeInterval timeInterval) {
         Cache cache = getCache();
         if (cache==null) return null;
-        final Element element = cache.get(new TimeIntervalCacheKey(apiKeyId, objectType, timeInterval));
+        final Element element = cache.get(new TimeIntervalCacheKey(apiKey.getId(), apiKey.getGuestId(), apiKey.getConnector().value(), objectType, timeInterval));
         if (element!=null) {
-            final CachedValueObjects objectValue = (CachedValueObjects)element.getObjectValue();
-            if (objectValue.valueObjects !=null) {
-                System.out.println("cache hit! " + apiKeyId + "/" + objectType);
-                return objectValue.valueObjects;
-            } else
-                System.out.println("cache miss " + apiKeyId + "/" + objectType);
-        }
+            final Collection<AbstractFacetVO<AbstractFacet>> valueObjects = (Collection<AbstractFacetVO<AbstractFacet>>)element.getObjectValue();
+            if (valueObjects !=null) {
+                System.out.println("cache hit! " + apiKey.getConnector().getName() + "/" + objectType);
+                return valueObjects;
+            }
+        } else
+            System.out.println("cache miss " + apiKey.getConnector().getName() + "/" + objectType);
         return null;
     }
 
-    public Collection<AbstractFacetVO<AbstractFacet>> getFacets(long apiKeyId, ObjectType objectType, List<String> dates) {
+    public Collection<AbstractFacetVO<AbstractFacet>> getFacets(ApiKey apiKey, ObjectType objectType, List<String> dates) {
         Cache cache = getCache();
         if (cache==null) return null;
-        final Element element = cache.get(new DatesCacheKey(apiKeyId, objectType, dates));
+        final Element element = cache.get(new DatesCacheKey(apiKey.getId(), apiKey.getGuestId(), apiKey.getConnector().value(), objectType, dates));
         if (element!=null) {
-            final CachedValueObjects objectValue = (CachedValueObjects)element.getObjectValue();
-            if (objectValue.valueObjects != null) {
-                System.out.println("cache hit! " + apiKeyId + "/" + objectType);
-                return objectValue.valueObjects;
+            final Collection<AbstractFacetVO<AbstractFacet>> valueObjects = (Collection<AbstractFacetVO<AbstractFacet>>)element.getObjectValue();
+            if (valueObjects != null) {
+                System.out.println("cache hit! " + apiKey.getConnector().getName() + "/" + objectType);
+                return valueObjects;
             }
-            else {
-                System.out.println("cache miss " + apiKeyId + "/" + objectType);
-            }
-        }
+        } else
+            System.out.println("cache miss " + apiKey.getConnector().getName() + "/" + objectType);
         return null;
     }
 
@@ -129,18 +126,18 @@ public class CacheManagerProxy {
 
     public void cacheFacets(final ApiKey apiKey, final ObjectType objectType, final Collection<AbstractFacetVO<AbstractFacet>> facets, final TimeInterval timeInterval) {
         Cache cache = getCache();
-        final TimeIntervalCacheKey key = new TimeIntervalCacheKey(apiKey.getId(), objectType, timeInterval);
+        final TimeIntervalCacheKey key = new TimeIntervalCacheKey(apiKey.getId(), apiKey.getGuestId(), apiKey.getConnector().value(), objectType, timeInterval);
         if (cache.get(key)==null) {
-            Element cacheElement = new Element(key, new CachedValueObjects(apiKey.getId(), apiKey.getGuestId(), apiKey.getConnector().value(), objectType,  facets));
+            Element cacheElement = new Element(key, facets);
             cache.put(cacheElement);
         }
     }
 
     public void cacheFacets(final ApiKey apiKey, final ObjectType objectType, final Collection<AbstractFacetVO<AbstractFacet>> facets, final List<String> dates) {
         Cache cache = getCache();
-        final DatesCacheKey key = new DatesCacheKey(apiKey.getId(), objectType, dates);
+        final DatesCacheKey key = new DatesCacheKey(apiKey.getId(), apiKey.getGuestId(), apiKey.getConnector().value(), objectType, dates);
         if (cache.get(key)==null) {
-            Element cacheElement = new Element(key, new CachedValueObjects(apiKey.getId(), apiKey.getGuestId(), apiKey.getConnector().value(), objectType, facets));
+            Element cacheElement = new Element(key, facets);
             cache.put(cacheElement);
         }
     }

@@ -8,15 +8,12 @@ import com.fluxtream.connectors.ObjectType;
  * Date: 15/10/13
  * Time: 23:27
  */
-public class DatesCacheKey {
+public class DatesCacheKey extends AbstractCacheKey {
 
-    private final long apiKeyId;
-    private final ObjectType objectType;
-    private final List<String> dates;
+    public final List<String> dates;
 
-    public DatesCacheKey(final long apiKeyId, final ObjectType objectType, List<String> dates) {
-        this.apiKeyId = apiKeyId;
-        this.objectType = objectType;
+    public DatesCacheKey(final long apiKeyId, final long guestId, final int api, final ObjectType objectType, List<String> dates) {
+        super(apiKeyId, guestId, api, objectType);
         this.dates = dates;
     }
 
@@ -26,9 +23,7 @@ public class DatesCacheKey {
             return false;
         DatesCacheKey other = (DatesCacheKey) o;
         boolean b = other.apiKeyId==apiKeyId;
-        boolean b2 = objectType==null
-                   ? other.objectType==null
-                   : other.objectType.value()==objectType.value();
+        boolean b2 = objectTypeValue == other.objectTypeValue;
         boolean b3 = other.dates.size()==dates.size();
         if (!(b && b2 && b3)) return false;
         for (String date : dates)
@@ -41,10 +36,7 @@ public class DatesCacheKey {
     public int hashCode() {
         int hash = 1;
         hash = hash * 37 + (int)(apiKeyId ^ (apiKeyId >>> 32));
-        if (objectType!=null)
-            hash = hash * 37 + objectType.value();
-        else
-            hash = hash * 37 + Integer.MIN_VALUE;
+        hash = hash * 37 + objectTypeValue;
         for (String date : dates)
             hash = hash * 37 + date.hashCode();
         return hash;
