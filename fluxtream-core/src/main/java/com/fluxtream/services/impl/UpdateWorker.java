@@ -93,6 +93,7 @@ class UpdateWorker implements Runnable {
 
         if(doUpdate) {
             AbstractUpdater updater = connectorUpdateService.getUpdater(conn);
+            guestService.setApiKeyToSynching(apiKey.getId(), true);
             switch (task.updateType) {
                 case INITIAL_HISTORY_UPDATE:
                     updateDataHistory(apiKey, updater);
@@ -179,7 +180,9 @@ class UpdateWorker implements Runnable {
         handleUpdateResult(apiKey, updateInfo, result);
     }
 
-	private void handleUpdateResult(ApiKey apiKey, final UpdateInfo updateInfo, UpdateResult updateResult) {
+	private void handleUpdateResult(ApiKey apiKey, final UpdateInfo updateInfo,
+			UpdateResult updateResult) {
+        guestService.setApiKeyToSynching(apiKey.getId(), false);
 		switch (updateResult.getType()) {
 		case DUPLICATE_UPDATE:
 			duplicateUpdate();
