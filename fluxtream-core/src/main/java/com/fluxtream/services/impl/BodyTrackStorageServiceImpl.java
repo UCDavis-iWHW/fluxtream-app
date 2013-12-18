@@ -60,6 +60,8 @@ public class BodyTrackStorageServiceImpl implements BodyTrackStorageService {
 	@Override
 	public void storeApiData(long guestId, List<AbstractFacet> facets) {
         logStoreApiData(guestId, facets);
+        //this will update the channel mapping bounds for all the data coming in through an extractor
+        bodyTrackHelper.updateChannelMappingTimeBounds(facets);
 
 		//Connector bodytrackConnector = Connector.getConnector("bodytrack");
 		//ApiKey bodytrackApiKey = guestService.getApiKey(guestId,

@@ -135,7 +135,7 @@ public class SmsBackupUpdater extends AbstractUpdater {
     }
 
 
-	private void flushEntry(final UpdateInfo updateInfo, final String username, final Message message, Class type) throws Exception {
+	private void flushEntry(final UpdateInfo updateInfo, final String username, final Message message, final Class type) throws Exception {
         final String emailId = message.getHeader("Message-ID")[0] + message.getHeader("X-smssync-id")[0];
         if (type == SmsEntryFacet.class){
             apiDataService.createOrReadModifyWrite(SmsEntryFacet.class,
@@ -288,6 +288,12 @@ public class SmsBackupUpdater extends AbstractUpdater {
                                                                facet.date = message.getReceivedDate();
                                                                facet.start = facet.date.getTime();
                                                                facet.end = facet.start + facet.seconds*1000;
+
+                                                               //find the channel mapping associated and update it's time boundaries
+                                                               bodyTrackHelper.updateChannelMappingTimeBounds(facet);
+
+
+
                                                            }
                                                            catch (Exception e){
                                                                e.printStackTrace();

@@ -367,6 +367,9 @@ public class GoogleCalendarUpdater extends SettingsAwareAbstractUpdater {
                 facet.recurringEventId = event.getRecurringEventId();
                 facet.sequence = event.getSequence();
                 facet.setUpdated(event.getUpdated());
+
+                bodyTrackHelper.updateChannelMappingTimeBounds(facet);
+
                 return facet;
             }
         };

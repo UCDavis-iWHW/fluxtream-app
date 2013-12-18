@@ -197,6 +197,10 @@ public class FlickrUpdater extends AbstractUpdater {
                             addLocation(updateInfo, locationResources, facet, dateTime);
                         }
                     }
+
+                    //find the channel mapping associated and update it's time boundaries
+                    bodyTrackHelper.updateChannelMappingTimeBounds(facet);
+
                     return facet;
                     }
                        catch (Throwable e) {

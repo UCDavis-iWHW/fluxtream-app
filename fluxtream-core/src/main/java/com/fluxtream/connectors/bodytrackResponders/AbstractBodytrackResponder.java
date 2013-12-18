@@ -90,7 +90,15 @@ public abstract class AbstractBodytrackResponder {
                 bounds.max = 1;
                 break;
         }
-        ApiKey apiKey = guestService.getApiKey(mapping.apiKeyId);
+        if (mapping.min_time != null)
+            bounds.min_time = mapping.min_time / 1000.0;
+        else
+            bounds.min_time = 0;
+        if (mapping.max_time != null)
+            bounds.max_time = mapping.max_time / 1000.0;
+        else
+            bounds.max_time = 0;
+        /*ApiKey apiKey = guestService.getApiKey(mapping.apiKeyId);
         if (mapping.objectTypeId == null){
             bounds.min_time = Double.MAX_VALUE;
             bounds.max_time = Double.MIN_VALUE;
@@ -117,7 +125,7 @@ public abstract class AbstractBodytrackResponder {
             if (facet!=null) {
                 bounds.max_time = facet.end / 1000.0;
             }
-        }
+        }                  */
         return bounds;
     }
 }

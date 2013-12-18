@@ -45,4 +45,7 @@ public class ChannelMapping extends AbstractEntity {
     public String internalDeviceName = null;
     public String internalChannelName = null;
 
+    public Long min_time = null;
+    public Long max_time = null;
+
 }

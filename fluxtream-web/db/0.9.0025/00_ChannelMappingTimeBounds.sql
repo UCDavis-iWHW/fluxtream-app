@@ -1,0 +1,1 @@
+ALTER TABLE `flx`.`ChannelMapping` ADD COLUMN `min_time` BIGINT(20) NULL  AFTER `timeType` , ADD COLUMN `max_time` BIGINT(20) NULL  AFTER `min_time`;

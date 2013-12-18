@@ -21,6 +21,7 @@ import com.fluxtream.Configuration;
 import com.fluxtream.TimeInterval;
 import com.fluxtream.aspects.FlxLogger;
 import com.fluxtream.connectors.bodytrackResponders.AbstractBodytrackResponder;
+import com.fluxtream.domain.AbstractFacet;
 import com.fluxtream.domain.ApiKey;
 import com.fluxtream.domain.ChannelMapping;
 import com.fluxtream.domain.CoachingBuddy;
@@ -504,6 +505,23 @@ public class BodyTrackHelper {
 
     public void persistChannelMapping(ChannelMapping mapping){
         em.persist(mapping);
+    }
+
+    public void updateChannelMappingTimeBounds(AbstractFacet facet){
+        List<ChannelMapping> channelMappings = JPAUtils.find(em,ChannelMapping.class,"channelMapping.byApiKey",facet.guestId,facet.apiKeyId);
+        for (ChannelMapping mapping : channelMappings){
+            if (mapping.objectTypeId == null || mapping.objectTypeId == facet.objectType){
+                mapping.min_time = mapping.min_time == null ? facet.start : Math.min(facet.start,mapping.min_time);
+                mapping.max_time = mapping.max_time == null ? facet.end : Math.max(facet.end,mapping.max_time);
+                em.persist(mapping);
+            }
+        }
+    }
+
+    //TODO: optimize this
+    public void updateChannelMappingTimeBounds(List<AbstractFacet> facets){
+        for (AbstractFacet facet : facets)
+            updateChannelMappingTimeBounds(facet);
     }
 
     public Source getSourceForApiKey(ApiKey key){
