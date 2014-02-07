@@ -35,6 +35,12 @@
     <http pattern="/channel.html" security="none" />
     <http pattern="/html/privacyPolicy.html" security="none" />
 
+    <http pattern="/sreport/" security="none" />
+    <http pattern="/sreport/${release}/js/**" security="none" />
+    <http pattern="/sreport/${release}/html/**" security="none" />
+    <http pattern="/sreport/${release}/css/**" security="none" />
+    <http pattern="/sreport/${release}/assets-home/**" security="none" />
+
     <http access-denied-page="/accessDenied" entry-point-ref="loginUrlAuthenticationEntryPoint"
 		use-expressions="true" create-session="ifRequired">
         <http-basic/>
@@ -73,7 +79,8 @@
 	<beans:bean id="successHandler"
 		class="com.fluxtream.auth.FlxSavedRequestAwareAuthenticationSuccessHandler">
 		<beans:property name="defaultTargetUrl" value="/checkIn" />
-		<beans:property name="alwaysUseDefaultTargetUrl" value="true" />
+        <beans:property name="targetUrlParameter" value="target" />
+		<beans:property name="alwaysUseDefaultTargetUrl" value="false" />
         <beans:property name="requestCache" ref="requestCache"/>
 	</beans:bean>
 
