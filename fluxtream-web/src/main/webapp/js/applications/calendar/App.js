@@ -356,6 +356,7 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
             switch (facet.type){
                 case "picasa-photo":
                 case "flickr-photo":
+                case "evernote-photo":
                 case "fluxtream_capture-photo":
                     facet.hasImage = true;
                     break;
@@ -498,6 +499,7 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
             Calendar.processFacets(digest.cachedData[connectorId]);
             digest.cachedData[connectorId].hasImages = false;
             switch (connectorId){
+                case "evernote-photo":
                 case "picasa-photo":
                 case "flickr-photo":
                 case "fluxtream_capture-photo":
@@ -614,7 +616,10 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
         return true;
     }
 
-
+   /**
+    * Inspects whats in the digest and sets the state of the filter buttons accordingly
+    * @param digest
+    */
     function processDigest(digest){
         $.each(Builder.getConnectorNames(), function(i, connectorName) {
             var buttonLink = Builder.getConnectorButton(connectorName),
@@ -622,14 +627,24 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
             button.hide();
         });
         $.each(digest.selectedConnectors, function(i, connector) {
+            var connectorConfig = App.getConnectorConfig(connector.connectorName);
             var connected = _.some(connector.facetTypes, function(facetType) {
-                return digest.cachedData[facetType] != null;
+                var hasTypedFacets = digest.cachedData[facetType] != null;
+                var objectType = facetType.split("-")[1];
+                if(Calendar.currentTab.name==="photos")
+                    hasTypedFacets = hasTypedFacets && objectType.indexOf("photo")!=-1;
+                console.log(facetType + " -> " + hasTypedFacets);
+                return hasTypedFacets;
             });
+
+            var configFilterLabel = connectorConfig.filterLabel,
+                filterLabel = configFilterLabel || connector.prettyName;
+
             var buttonLink = Builder.getConnectorButton(connector.connectorName),
                 button = buttonLink.parent();
             buttonLink
                 .toggleClass("flx-disconnected", !connected)
-                .text(connector.prettyName);
+                .text(filterLabel);
             if (connected) {
                 buttonLink.css("border-bottom-color",App.getConnectorConfig(connector.connectorName).color);
             }
