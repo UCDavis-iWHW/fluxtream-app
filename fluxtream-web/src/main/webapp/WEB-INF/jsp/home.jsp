@@ -1,8 +1,8 @@
-<%@ page import="com.fluxtream.auth.AuthHelper" %>
+<%@ page import="org.fluxtream.auth.AuthHelper" %>
 <%@ page pageEncoding="utf-8" contentType="text/html; charset=UTF-8"%><%@ taglib
 	uri="http://granule.com/tags" prefix="g"
 %><%@ page import="java.util.List"
-%><%@ page import="com.fluxtream.domain.Guest"
+%><%@ page import="org.fluxtream.domain.Guest"
 %><%
     Boolean tracker = (Boolean)request.getAttribute("tracker");
     Boolean intercom = (Boolean)request.getAttribute("intercom");
@@ -82,7 +82,7 @@
                             </ul>
                             <ul class="nav pull-right">
                                 <li class="divider-vertical"></li>
-                                <li class="dropdown" id="" data-container="body">
+                                <li class="dropdown" id="helpDropdownToggle" data-container="body">
                                     <a href="#" class="dropdown-toggle" data-toggle="dropdown">Help <i class="icon-lightbulb icon-large"></i></a>
                                     <ul class="dropdown-menu">
                                         <li><a href="javascript:App.quickStart();">Quick Start</a></li>

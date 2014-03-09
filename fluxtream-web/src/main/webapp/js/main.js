@@ -3,10 +3,6 @@ require.config({
 });
 
 require(['App', 'Connectors'], function(App, Connectors) {
-	document.body.onselectstart = function(event) { if ((event.target || event.srcElement).nodeName !== 'INPUT') return false; };
-	document.body.style.MozUserSelect = "none";
-	document.body.style.KhtmlUserSelect = "none";
-	document.body.unselectable = "on";
 	App.initialize();
     setAvatarImage();
 });
@@ -18,6 +14,7 @@ function setAvatarImage() {
             if (result.type!="none") {
                 $("#profileIcon").replaceWith("<img src=\"" + result.url + "\" style=\"display:inline;width:27px;margin: 0 1px 0 4px;\" width=27 height=27>");
                 $("#profileIconCaret").css("margin-top", "10px");
+                $("#helpDropdownToggle").css("margin-top", "3px");
                 $("#connectorsDropdownToggle").css("margin-top", "3px");
                 $("#appsMenuWrapper").css("margin-top", "4px");
                 $(".brand").css("margin-top", "3px");
@@ -61,7 +58,6 @@ if (aggressiveLoading) {
     require([
         "applications/calendar/tabs/clock/ClockTab",
         "applications/calendar/tabs/dashboards/DashboardsTab",
-        "applications/calendar/tabs/diary/DiaryTab",
         "applications/calendar/tabs/list/ListTab",
         "applications/calendar/tabs/map/MapTab",
         "applications/calendar/tabs/photos/PhotosTab",

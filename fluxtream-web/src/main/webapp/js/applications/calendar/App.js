@@ -89,7 +89,12 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
            url: url,
            type: "GET",
            data: params,
+           dataType: "JSON",
            success: function(response) {
+               if (response.result == "KO"){//signifies error was returned
+                   handleError("You aren't logged in!")();
+                   return;
+               }
                Calendar.timeRange.start = response.start;
                Calendar.timeRange.end = response.end;
                if (Calendar.dateAxisCursorPosition * 1000 < Calendar.timeRange.start || Calendar.dateAxisCursorPosition * 1000 > Calendar.timeRange.end)
@@ -162,7 +167,12 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
             async: false,
             type: "GET",
             data: {state: state.tabState},
+            dataType: "JSON",
             success: function(response) {
+                if (response.result == "KO"){//signifies error was returned
+                    handleError("You aren't logged in!")();
+                    return;
+                }
                 Calendar.timeRange.start = response.start;
                 Calendar.timeRange.end = response.end;
                 if (Calendar.dateAxisCursorPosition * 1000 < Calendar.timeRange.start || Calendar.dateAxisCursorPosition * 1000 > Calendar.timeRange.end)
@@ -346,10 +356,13 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
             switch (facet.type){
                 case "picasa-photo":
                 case "flickr-photo":
+                case "evernote-photo":
+                case "up-serving":
                 case "fluxtream_capture-photo":
                     facet.hasImage = true;
                     break;
                 case "mymee-observation":
+                case "sms_backup-sms":
                     facet.hasImage = facet.photoUrl != null;
                     break;
             }
@@ -488,12 +501,15 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
             Calendar.processFacets(digest.cachedData[connectorId]);
             digest.cachedData[connectorId].hasImages = false;
             switch (connectorId){
+                case "evernote-photo":
+                case "up-serving":
                 case "picasa-photo":
                 case "flickr-photo":
                 case "fluxtream_capture-photo":
                     digest.cachedData[connectorId].hasImages = true;
                     break;
                 case "mymee-observation":
+                case "sms_backup-sms":
                     for (var i = 0; i < digest.cachedData[connectorId].length && !digest.cachedData[connectorId].hasImages; i++){
                         digest.cachedData[connectorId].hasImages = digest.cachedData[connectorId][i].hasImage;
                     }
@@ -518,12 +534,14 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
             }
             for (var i = 0; i < digest.cachedData[connectorId].length; i++){
                 var facet = digest.cachedData[connectorId][i];
-                if (hasGeneralSettings)
+                if (hasGeneralSettings && config.applySettings != null)
                     config.applySettings(facet, digest.settings.connectorSettings);
                 if (digest.cachedData[connectorId].hasImages){
                     switch (connectorId){
                         case "picasa-photo":
                         case "flickr-photo":
+                        case "up-serving":
+                        case "evernote-photo":
                         case "fluxtream_capture-photo":
                             facet.hasImage = true;
                             break;
@@ -604,7 +622,10 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
         return true;
     }
 
-
+   /**
+    * Inspects whats in the digest and sets the state of the filter buttons accordingly
+    * @param digest
+    */
     function processDigest(digest){
         $.each(Builder.getConnectorNames(), function(i, connectorName) {
             var buttonLink = Builder.getConnectorButton(connectorName),
@@ -612,14 +633,42 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
             button.hide();
         });
         $.each(digest.selectedConnectors, function(i, connector) {
+            var connectorConfig = App.getConnectorConfig(connector.connectorName);
             var connected = _.some(connector.facetTypes, function(facetType) {
-                return digest.cachedData[facetType] != null;
+                var hasTypedFacets = digest.cachedData[facetType] != null;
+                //var objectType = facetType.split("-")[1];
+                if(Calendar.currentTab.name==="photos") {
+                    // handle special case of mymee observations
+                    //if (hasTypedFacets&&objectType.indexOf("observation")!=-1){
+                    //    hasTypedFacets = false;
+                    //    for (var i=0;i<digest.cachedData[facetType].length; i++){
+                    //        if (typeof(digest.cachedData[facetType][i].photoUrl)!="undefined") {
+                    //            hasTypedFacets = true;
+                    //            break;
+                    //        }
+                    //    }
+                    //} else {
+                    //    // handle evernote and jawbone servings
+                    //    var isPhotoObjectType = objectType.indexOf("photo")!=-1;
+                    //    var isServingObjectType = objectType.indexOf("serving")!=-1;
+                    //    hasTypedFacets = hasTypedFacets && (isPhotoObjectType || isServingObjectType);
+                    //
+                    //}
+                    hasTypedFacets = hasTypedFacets && digest.cachedData[facetType].hasImages;
+                }
+                return hasTypedFacets;
             });
+
+            var configFilterLabel = connectorConfig.filterLabel,
+                filterLabel = configFilterLabel || connector.prettyName;
+
+            filterLabel = filterLabel.replace("_", " ");
+
             var buttonLink = Builder.getConnectorButton(connector.connectorName),
                 button = buttonLink.parent();
             buttonLink
                 .toggleClass("flx-disconnected", !connected)
-                .text(connector.prettyName);
+                .text(filterLabel);
             if (connected) {
                 buttonLink.css("border-bottom-color",App.getConnectorConfig(connector.connectorName).color);
             }
@@ -936,7 +985,7 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
             return false;
         });
         var element;
-        for (element = details.find(".timedropdown"); !element.hasClass("facetDetails"); element = element.parent());
+        for (element = details.find(".timedropdown");element.length > 0 && element[0] != "BODY" && !element.hasClass("facetDetails"); element = element.parent());
 
         var facet = getFacet(element.attr("facettype"),parseInt(element.attr('itemid')));
         Calendar.bindShowOnXDropDown(details.find(".timedropdown"),facet);

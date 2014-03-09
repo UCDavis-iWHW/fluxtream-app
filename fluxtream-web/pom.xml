@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<artifactId>fluxtream-app</artifactId>
-		<groupId>com.fluxtream</groupId>
+		<groupId>org.fluxtream</groupId>
 		<version>1.0</version>
 	</parent>
 	<artifactId>fluxtream-web</artifactId>
@@ -38,23 +38,23 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>1.2.1</version>
                 <executions>
-                    <execution>
-                        <phase>generate-resources</phase>
-                        <id>js</id>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <executable>node</executable>
-                                <arguments>
-                                <argument>r.js</argument>
-                                <argument>-o</argument>
-                                <argument>name=main</argument>
-                                <argument>out=src/main/webapp/js/main-built.js</argument>
-                                <argument>baseUrl=src/main/webapp/js/</argument>
-                            </arguments>
-                        </configuration>
-                    </execution>
+                    <!--<execution>-->
+                        <!--<phase>generate-resources</phase>-->
+                        <!--<id>js</id>-->
+                        <!--<goals>-->
+                            <!--<goal>exec</goal>-->
+                        <!--</goals>-->
+                        <!--<configuration>-->
+                            <!--<executable>node</executable>-->
+                                <!--<arguments>-->
+                                <!--<argument>r.js</argument>-->
+                                <!--<argument>-o</argument>-->
+                                <!--<argument>name=main</argument>-->
+                                <!--<argument>out=src/main/webapp/js/main-built.js</argument>-->
+                                <!--<argument>baseUrl=src/main/webapp/js/</argument>-->
+                            <!--</arguments>-->
+                        <!--</configuration>-->
+                    <!--</execution>-->
                     <execution>
                         <phase>generate-resources</phase>
                         <goals>
@@ -62,7 +62,7 @@
                         </goals>
                         <configuration>
                             <includePluginDependencies>true</includePluginDependencies>
-                            <mainClass>com.fluxtream.maven.GetLastGitCommit</mainClass>
+                            <mainClass>org.fluxtream.maven.GetLastGitCommit</mainClass>
                             <arguments>
                                <argument>${release}</argument>
                             </arguments>
@@ -87,17 +87,17 @@
 	</build>
 	<dependencies>
 		<dependency>
-			<groupId>com.fluxtream</groupId>
+			<groupId>org.fluxtream</groupId>
 			<artifactId>fluxtream-core</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>com.fluxtream</groupId>
+			<groupId>org.fluxtream</groupId>
 			<artifactId>fluxtream-connectors</artifactId>
 			<version>${project.version}</version>
 		</dependency>
     </dependencies>
     <properties>
-        <release>0.9.0022</release>
+        <release>0.9.0027</release>
     </properties>
 </project>

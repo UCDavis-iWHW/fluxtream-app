@@ -986,6 +986,15 @@ define(
             return [r,theta];
         }
 
+        App.adjustiFrameHeight = function(iFrameId) {
+            var iFrame = document.getElementById(iFrameId);
+            if(iFrame) {
+                iFrame.height = "";
+                var height = iFrame.contentWindow.document.body.scrollHeight + "px";
+                iFrame.height = height;
+            }
+        }
+
         App.quickStart = function() {
             App.loadMustacheTemplate("settingsTemplates.html","quickStartDialog",function(template){
                 var html = template.render({release : window.FLX_RELEASE_NUMBER});
