@@ -1,3 +1,5 @@
+// Yury - this  should be tailored
+
 CREATE TABLE `Facet_FluxtreamCaptureObservation` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `api` int(11) NOT NULL,
@@ -11,7 +13,7 @@ CREATE TABLE `Facet_FluxtreamCaptureObservation` (
   `tags` longtext,
   `timeUpdated` bigint(20) NOT NULL,
   `note` longtext,
-  `mymeeId` varchar(255) NOT NULL,
+  `mymeeId` varchar(255) NOT NULL,                    // Yury - Should be changed
   `name` varchar(255) DEFAULT NULL,
   `user` varchar(255) DEFAULT NULL,
   `timezoneOffset` int(11) NOT NULL,

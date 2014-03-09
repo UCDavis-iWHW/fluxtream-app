@@ -23,6 +23,8 @@ import com.fluxtream.domain.AbstractFacet;
 
 public class FluxtreamCaptureObservationFacet extends AbstractFacet {
     // NotNull
+
+    // Yury - colums in the table
     public String mymeeId;
 
     // User-friendly name of Mymee "topic" -- the name of the Mymee button used to make the observation.
