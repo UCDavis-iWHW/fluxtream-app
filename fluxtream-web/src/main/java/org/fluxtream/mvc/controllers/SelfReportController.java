@@ -1,7 +1,7 @@
-package com.fluxtream.mvc.controllers;
+package org.fluxtream.mvc.controllers;
 
 import javax.servlet.http.HttpServletResponse;
-import com.fluxtream.Configuration;
+import org.fluxtream.Configuration;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
