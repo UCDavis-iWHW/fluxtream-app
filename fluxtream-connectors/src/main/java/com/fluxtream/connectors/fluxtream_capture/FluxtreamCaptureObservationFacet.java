@@ -1,12 +1,12 @@
-package com.fluxtream.connectors.fluxtream_capture;
+package org.fluxtream.connectors.fluxtream_capture;
 
 import javax.persistence.Entity;
 import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
-import com.fluxtream.connectors.annotations.ObjectTypeSpec;
-import com.fluxtream.connectors.mymee.MyMeePhotoFacetFinderStrategy;
-import com.fluxtream.connectors.mymee.MymeeObservationFacetExtractor;
-import com.fluxtream.domain.AbstractFacet;
+import org.fluxtream.connectors.annotations.ObjectTypeSpec;
+import org.fluxtream.connectors.mymee.MyMeePhotoFacetFinderStrategy;
+import org.fluxtream.connectors.mymee.MymeeObservationFacetExtractor;
+import org.fluxtream.domain.AbstractFacet;
 
 /**
  *
