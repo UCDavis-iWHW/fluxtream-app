@@ -28,25 +28,21 @@ public class FlxSavedRequestAwareAuthenticationSuccessHandler extends SimpleUrlA
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                         Authentication authentication) throws ServletException, IOException {
         SavedRequest savedRequest = requestCache.getRequest(request, response);
-
-        if (savedRequest == null) {
-            super.onAuthenticationSuccess(request, response, authentication);
-
-            return;
-        }
         String targetUrlParameter = getTargetUrlParameter();
-        if (isAlwaysUseDefaultTargetUrl() || (targetUrlParameter != null && StringUtils.hasText(request.getParameter(targetUrlParameter)))) {
-            super.onAuthenticationSuccess(request, response, authentication);
 
+        if (savedRequest!=null) {
+            clearAuthenticationAttributes(request);
+
+            // Use the DefaultSavedRequest URL
+            String targetUrl = savedRequest.getRedirectUrl();
+            logger.debug("Redirecting to DefaultSavedRequest Url: " + targetUrl);
+            getRedirectStrategy().sendRedirect(request, response, targetUrl);
+        } else if (targetUrlParameter != null && StringUtils.hasText(request.getParameter(targetUrlParameter))){
+            super.onAuthenticationSuccess(request, response, authentication);
             return;
         }
+        super.onAuthenticationSuccess(request, response, authentication);
 
-        clearAuthenticationAttributes(request);
-
-        // Use the DefaultSavedRequest URL
-        String targetUrl = savedRequest.getRedirectUrl();
-        logger.debug("Redirecting to DefaultSavedRequest Url: " + targetUrl);
-        getRedirectStrategy().sendRedirect(request, response, targetUrl);
     }
 
     public void setRequestCache(RequestCache requestCache) {
