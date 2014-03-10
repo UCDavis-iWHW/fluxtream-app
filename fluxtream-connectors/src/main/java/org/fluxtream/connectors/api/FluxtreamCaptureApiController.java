@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 // This will actually appear under /api/fluxtream_capture/ because of the
-// configuration in
+// configuration for org.fluxtream.connectors.api in web.xml
 @Path("/fluxtream_capture")
 @Component("RESTFluxtreamCaptureApiController")
 @Scope("request")
@@ -37,11 +37,8 @@ public class FluxtreamCaptureApiController {
             return gson.toJson(new StatusModel(false,"Access Denied"));
         }
 
-        String response = "Works!";
-        //StatusModel statusModel = new StatusModel(true,response);
-        //return gson.toJson(statusModel);
-
-        response = "{\"result\":\"OK\",\"message\":\"Works!\"}";
-        return(response);
+        String response = "Works! guestId is "+ Long.toString(guestId);
+        StatusModel statusModel = new StatusModel(true,response);
+        return gson.toJson(statusModel);
     }
 }
