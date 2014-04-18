@@ -109,6 +109,24 @@ body {
     height: 100%;
     margin-bottom: 4em;
 }
+
+a:link {
+    text-decoration:none;
+    color:black;
+}
+a:visited {
+    text-decoration:none;
+    color:black;
+}
+a:hover {
+    text-decoration:none;
+    color:black;
+}
+a:active {
+    text-decoration:none;
+    color:black;
+}
+
 ol,
 ul {
   list-style: none;

@@ -116,7 +116,6 @@ public class FluxtreamCaptureApiController {
          }
     }
 
-
     @GET
     @Path("/getAllTopics")
     @Produces({ MediaType.APPLICATION_JSON })

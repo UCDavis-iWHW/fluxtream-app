@@ -21,17 +21,17 @@
             </div>
             <div id="header" style="background: #FF9226; width: 33.3333333%; height: 10vh; float:left; padding: 0em; margin: 0em; line-height: 10vh; text-align: center; color: #FFFFFF; font-size:6vh;">Home</div>
             <div style="background: #FF9226; width: 33.3333333%; height: 10vh; float:left; padding: 0em; margin: 0em; line-height: 10vh; text-align: right;">
-                <a href="/logout"><img src="${release}/images/exit.png" height="50%" style="padding-top:3%; padding-right: 15%"></a></div>
+                <a href="/logout"><img id="logoutImage" src="${release}/images/exit.png" height="50%" style="padding-top:3%; padding-right: 15%"></a></div>
         </div>
     </div>
 </div>
 <p> </p>
 <div id="footer">
     <div style="background: #FF9226; width: 50%; height: 10vh; float:left; padding: 0em; margin: 0em; text-align: left;">
-        <a href="#" id="historyLink"><img src="${release}/images/history.png" height="50%" style="padding-top:3%; padding-left: 15%"></a>
+        <a href="#" id="historyLink"><img id="historyImage" src="${release}/images/history.png" height="50%" style="padding-top:3%; padding-left: 15%"></a>
     </div>
     <div style="background: #FF9226; width: 50%; height: 10vh; float:left; padding: 0em; margin: 0em; text-align: right;">
-        <a href="#" id="settingsLink"><img src="${release}/images/settings.png" height="50%" style="padding-top:3%; padding-right: 15%"></a>
+        <a href="#" id="settingsLink"><img id="settingsImage" src="${release}/images/settings.png" height="50%" style="padding-top:3%; padding-right: 15%"></a>
     </div>
 </div>
 
