@@ -18,6 +18,5 @@ public class FluxtreamCaptureObservationFacetVO extends AbstractInstantFacetVO<F
 
     @Override
     protected void fromFacet(final FluxtreamCaptureObservationFacet facet, final TimeInterval timeInterval, final GuestSettings settings) throws OutsideTimeBoundariesException {
-         // Would add in your own fields here
     }
 }

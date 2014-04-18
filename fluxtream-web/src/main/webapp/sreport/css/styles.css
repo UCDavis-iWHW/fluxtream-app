@@ -105,7 +105,9 @@ section {
   display: block;
 }
 body {
-  line-height: 1;
+    line-height: 1;
+    height: 100%;
+    margin-bottom: 4em;
 }
 ol,
 ul {
@@ -125,4 +127,35 @@ q:after {
 table {
   border-collapse: collapse;
   border-spacing: 0;
+}
+.flex-container {
+  padding: 0em;
+  margin: 0em;
+  display: flex;
+  flex-direction: column;
+}
+.flex-item-header {
+  height: 16vh;
+  padding: 2%;
+  margin: 0em;
+  background: rgba(0, 0, 0, 0.29);
+  border: 1px solid black;
+}
+
+.flex-item {
+    height: 16vh;
+    padding: 2%;
+    margin: 0em;
+    background: rgba(0, 0, 0, 0.29);
+    border: 1px solid black;
+}
+
+#footer {
+    position: fixed;
+    bottom: 0;
+    height: 10vh;
+    clear: both;
+    width: 100%;
+    background-color: #FF9226;
+    border: 2px solid black;
 }

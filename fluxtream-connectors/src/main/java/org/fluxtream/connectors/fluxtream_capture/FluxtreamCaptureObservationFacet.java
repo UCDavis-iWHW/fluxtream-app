@@ -13,13 +13,18 @@ import org.fluxtream.domain.AbstractFacet;
  * @author Candide Kemmler (candide@fluxtream.com)
  */
 @Entity(name="Facet_FluxtreamCaptureObservation")
-@ObjectTypeSpec(name = "observation", value = 1, isImageType=true, parallel=false, prettyname = "Observation", photoFacetFinderStrategy=MyMeePhotoFacetFinderStrategy.class)
+@ObjectTypeSpec(name = "observation", value = 2, isImageType=true, parallel=false, prettyname = "Observation", photoFacetFinderStrategy=MyMeePhotoFacetFinderStrategy.class)
 @NamedQueries({
 })
 
 // Most of the fields are optional;  non-optional fields are labeled as NotNull
 
 public class FluxtreamCaptureObservationFacet extends AbstractFacet {
+
+    public long creationTime;
+    public Integer topicID;
+    public Integer timezoneOffset;
+    public Integer value;
 
     public FluxtreamCaptureObservationFacet() {
         super();

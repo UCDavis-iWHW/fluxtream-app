@@ -36,6 +36,7 @@
     <mvc:resources mapping="/sreport/${release}/js/**" location="/sreport/js/" cache-period="31556926" />
     <mvc:resources mapping="/sreport/${release}/less/**" location="/sreport/less/" cache-period="31556926" />
     <mvc:resources mapping="/sreport/${release}/css/**" location="/sreport/css/" cache-period="31556926" />
+    <mvc:resources mapping="/sreport/${release}/images/**" location="/sreport/images/" cache-period="31556926" />
 
     <mvc:resources mapping="/widgets.json" location="/widgets/widgets.json" cache-period="31556926"/>
     <mvc:resources mapping="/channel.html" location="/channel.html" cache-period="31556926"/>

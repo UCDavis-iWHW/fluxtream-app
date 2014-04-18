@@ -13,6 +13,7 @@ import org.fluxtream.auth.AuthHelper;
 import org.fluxtream.connectors.Connector;
 import org.fluxtream.connectors.fitbit.FitbitTrackerActivityFacet;
 import org.fluxtream.connectors.fluxtream_capture.FluxtreamCaptureObservationFacet;
+import org.fluxtream.connectors.fluxtream_capture.FluxtreamCaptureTopic;
 import org.fluxtream.connectors.location.LocationFacet;
 import org.fluxtream.connectors.mymee.MymeeObservationFacet;
 import org.fluxtream.domain.ApiKey;
@@ -28,6 +29,8 @@ import org.joda.time.DateTimeConstants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
+import org.fluxtream.connectors.fluxtream_capture.FluxtreamCaptureHelper;
+
 
 // This will actually appear under /api/fluxtream_capture/ because of the
 // configuration for org.fluxtream.connectors.api in web.xml
@@ -44,12 +47,14 @@ public class FluxtreamCaptureApiController {
     @Autowired
     protected ApiDataService apiDataService;
 
+    @Autowired
+    FluxtreamCaptureHelper fluxtreamCaptureHelper;
+
     Gson gson = new Gson();
 
     @GET
     @Path("/test")
-    //@Produces({ MediaType.APPLICATION_JSON })
-    @Produces({MediaType.TEXT_PLAIN})
+    @Produces({ MediaType.APPLICATION_JSON })
     public String test() {
         long guestId;
         try {
@@ -92,7 +97,7 @@ public class FluxtreamCaptureApiController {
         final String entityName = JPAUtils.getEntityName(FluxtreamCaptureObservationFacet.class);
         final List<FluxtreamCaptureObservationFacet> newest = jpaDaoService.executeQueryWithLimit(
                 "SELECT facet from " + entityName + " facet WHERE facet.apiKeyId=? ORDER BY facet.start DESC",
-                1,
+                100,
                 FluxtreamCaptureObservationFacet.class, apiKey.getId());
 
         String response = "";
@@ -101,7 +106,7 @@ public class FluxtreamCaptureApiController {
         if (newest.size()>0) {
              System.out.println("Found one!");
             response = "Found one!";
-            return gson.toJson(newest.get(0));
+            return gson.toJson(newest);
          }
          else {
              System.out.println("No observations");
@@ -110,6 +115,35 @@ public class FluxtreamCaptureApiController {
             return gson.toJson(statusModel);
          }
     }
+
+
+    @GET
+    @Path("/getAllTopics")
+    @Produces({ MediaType.APPLICATION_JSON })
+    public String getAllTopics() {
+        long guestId;
+        try {
+            Guest guest = AuthHelper.getGuest();
+            guestId = guest.getId();
+
+            List<FluxtreamCaptureTopic> topics = fluxtreamCaptureHelper.getTopics(guestId);
+
+            // Check if we got anything
+            if (topics != null && topics.size()>0) {
+                System.out.println("Found topics");
+                return gson.toJson(topics);
+            }
+
+            // If topics list is empty
+            System.out.println("No topics found");
+            return "[]";
+
+        } catch (Throwable e) {
+            return gson.toJson(new StatusModel(false,"Access Denied"));
+        }
+
+    }
+
 
     @GET
     @Path("/insertTestObservation")
