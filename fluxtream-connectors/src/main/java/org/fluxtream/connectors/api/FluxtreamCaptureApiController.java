@@ -1,35 +1,27 @@
 package org.fluxtream.connectors.api;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.google.gson.Gson;
+import org.fluxtream.connectors.fluxtream_capture.FluxtreamCaptureHelper;
+import org.fluxtream.connectors.fluxtream_capture.FluxtreamCaptureObservationFacet;
+import org.fluxtream.connectors.fluxtream_capture.FluxtreamCaptureTopic;
+import org.fluxtream.core.auth.AuthHelper;
+import org.fluxtream.core.connectors.Connector;
+import org.fluxtream.core.domain.ApiKey;
+import org.fluxtream.core.domain.Guest;
+import org.fluxtream.core.mvc.models.StatusModel;
+import org.fluxtream.core.services.ApiDataService;
+import org.fluxtream.core.services.GuestService;
+import org.fluxtream.core.services.JPADaoService;
+import org.fluxtream.core.utils.JPAUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Component;
+
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
-import com.google.gson.Gson;
-import net.sf.json.JSONArray;
-import net.sf.json.JSONObject;
-import org.fluxtream.auth.AuthHelper;
-import org.fluxtream.connectors.Connector;
-import org.fluxtream.connectors.fitbit.FitbitTrackerActivityFacet;
-import org.fluxtream.connectors.fluxtream_capture.FluxtreamCaptureObservationFacet;
-import org.fluxtream.connectors.fluxtream_capture.FluxtreamCaptureTopic;
-import org.fluxtream.connectors.location.LocationFacet;
-import org.fluxtream.connectors.mymee.MymeeObservationFacet;
-import org.fluxtream.domain.ApiKey;
-import org.fluxtream.domain.Guest;
-import org.fluxtream.domain.Tag;
-import org.fluxtream.mvc.models.StatusModel;
-import org.fluxtream.services.ApiDataService;
-import org.fluxtream.services.GuestService;
-import org.fluxtream.services.JPADaoService;
-import org.fluxtream.utils.JPAUtils;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeConstants;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Scope;
-import org.springframework.stereotype.Component;
-import org.fluxtream.connectors.fluxtream_capture.FluxtreamCaptureHelper;
+import java.util.List;
 
 
 // This will actually appear under /api/fluxtream_capture/ because of the
