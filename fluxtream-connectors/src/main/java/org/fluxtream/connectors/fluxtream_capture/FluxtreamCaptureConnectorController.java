@@ -1,22 +1,14 @@
 package org.fluxtream.connectors.fluxtream_capture;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.GET;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.MediaType;
-import org.fluxtream.mvc.models.CalendarModel;
-import org.fluxtream.services.GuestService;
-import org.fluxtream.services.MetadataService;
+import com.google.gson.Gson;
+import org.fluxtream.core.services.GuestService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
-import org.fluxtream.auth.AuthHelper;
-import org.fluxtream.domain.Guest;
-import org.fluxtream.mvc.models.StatusModel;
-import com.google.gson.Gson;
+
+import javax.servlet.http.HttpServletRequest;
 
 /**
  * @author Chris Bartley (bartley@cmu.edu)

@@ -1,10 +1,9 @@
 package org.fluxtream.connectors.fluxtream_capture;
 
-import org.fluxtream.domain.AbstractEntity;
+import org.fluxtream.core.domain.AbstractEntity;
 import org.hibernate.annotations.Index;
 
 import javax.persistence.Entity;
-import javax.persistence.Lob;
 import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
 
