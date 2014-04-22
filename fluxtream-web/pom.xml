@@ -62,7 +62,7 @@
                         </goals>
                         <configuration>
                             <includePluginDependencies>true</includePluginDependencies>
-                            <mainClass>org.fluxtream.maven.GetLastGitCommit</mainClass>
+                            <mainClass>org.fluxtream.core.maven.GetLastGitCommit</mainClass>
                             <arguments>
                                <argument>${release}</argument>
                             </arguments>
@@ -98,6 +98,6 @@
 		</dependency>
     </dependencies>
     <properties>
-        <release>0.9.0027</release>
+        <release>0.9.0032</release>
     </properties>
 </project>

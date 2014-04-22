@@ -1,7 +1,6 @@
 package org.fluxtream.connectors.fluxtream_capture;
 
-import org.fluxtream.domain.GrapherView;
-import org.fluxtream.utils.JPAUtils;
+import org.fluxtream.core.utils.JPAUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 

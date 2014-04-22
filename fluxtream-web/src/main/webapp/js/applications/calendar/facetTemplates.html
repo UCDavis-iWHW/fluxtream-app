@@ -63,7 +63,7 @@
             <div class="facetDetails {{type}}-{{id}}" facettype="{{type}}" itemid="{{id}}">
                 <div class="facet-edit"><a href="javascript:void(0)" class="icon icon-comment" style="width:32px;float:right"></a></div>
                 {{#displayDate}}<div>{{displayDate}}</div>{{/displayDate}}
-                {{^allDay}}<div class="flx-tTime"><a class="timedropdown" href="javascript:void(0)" data-toggle="dropdown">{{time}} <span class="flx-dataLabel">{{ampm}}</span></a></div>{{/allDay}}
+                {{^allDay}}<div class="flx-tTime"><a class="timedropdown" href="javascript:void(0)" data-toggle="dropdown">{{#startTime}}{{hours}}:{{minutes}} <span class="flx-dataLabel">{{ampm}}</span>{{/startTime}} <span class="flx-dataLabel">-</span> {{#endTime}}{{hours}}:{{minutes}} <span class="flx-dataLabel">{{ampm}}</span>{{/endTime}}</a></div>{{/allDay}}
                 {{#allDay}}<div class="allDayEvent">All-Day</div>{{/allDay}}
                 <div class="flx-data">
                     <div class="bullet" style="background-color:{{color}};color:{{color}}"></div>
@@ -137,7 +137,6 @@
             <div class="facetDetails {{type}}-{{id}}" facettype="{{type}}" itemid="{{id}}">
                 <div class="facet-edit"><a href="javascript:void(0)" class="icon icon-comment" style="width:32px;float:right"></a></div>
                 {{#displayDate}}<div>{{displayDate}}</div>{{/displayDate}}
-                <div class="flx-tTime"><a class="timedropdown" href="javascript:void(0)" data-toggle="dropdown">{{#startTime}}{{hours}}:{{minutes}} <span class="flx-dataLabel">{{ampm}}</span>{{/startTime}}{{#endTime}} <span class="flx-dataLabel">-</span> {{hours}}:{{minutes}} <span class="flx-dataLabel">{{ampm}}</span>{{/endTime}}</a></div>
                 <div class="flx-data">
                     <span class="flx-steps">
                         <span class="flx-dataLabel">You walked</span>
@@ -792,9 +791,14 @@
                 {{/hasActivities}}
                 <div class="flx-finedetails flx-collapsed">
                     {{#activities}}
-                    <div class="flx-data">{{activity}}{{#distance}} ({{distance}}){{/distance}}</div>
-                    <div class="flx-tTime">{{#startTime}}{{hours}}:{{minutes}} <span class="flx-dataLabel">{{ampm}}</span>{{/startTime}} - {{#endTime}}{{hours}}:{{minutes}} <span class="flx-dataLabel">{{ampm}}</span>{{/endTime}}</div>
-                    {{#steps}}{{steps}} steps{{/steps}}
+                    {{^manual}}
+                        <div class="flx-data">{{activity}}{{#distance}} ({{distance}}){{/distance}}</div>
+                        <div class="flx-tTime">{{#startTime}}{{hours}}:{{minutes}} <span class="flx-dataLabel">{{ampm}}</span>{{/startTime}} - {{#endTime}}{{hours}}:{{minutes}} <span class="flx-dataLabel">{{ampm}}</span>{{/endTime}}</div>
+                        {{#steps}}{{steps}} steps{{/steps}}
+                    {{/manual}}
+                    {{#manual}}
+                        <div class="flx-data">{{activity}} {{#duration}}{{#hours}}{{hours}} hrs {{/hours}}{{#minutes}}{{minutes}} minutes{{/minutes}}{{/duration}}</div>
+                    {{/manual}}
                     {{/activities}}
                 </div>
                 {{#comment}}<div class="facet-comment-text">{{comment}}</div>{{/comment}}

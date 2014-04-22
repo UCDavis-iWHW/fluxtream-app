@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans:beans xmlns="http://www.springframework.org/schema/security"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:beans="http://www.springframework.org/schema/beans"
-	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:beans="http://www.springframework.org/schema/beans"
+             xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
 		http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.1.xsd">
 
 	<global-method-security secured-annotations="enabled"/>
 
+    <!-- assets -->
 	<http pattern="/support/*" security="none" />
 	<http pattern="/**/notify" security="none" />
 	<http pattern="/${release}/js/**" security="none" />
@@ -22,18 +24,31 @@
 	<http pattern="/notSupported" security="none" />
 	<http pattern="/favicon.ico" security="none" />
 	<http pattern="/apple-touch-icon-precomposed.png" security="none" />
+    <http pattern="/html/privacyPolicy.html" security="none" />
+
+    <!-- registration -->
 	<http pattern="/get-invitation*" security="none" />
     <http pattern="/createAccount*" security="none" />
     <http pattern="/register*" security="none" />
     <http pattern="/createAccountForm*" security="none" />
     <http pattern="/widgets.json" security="none" />
     <http pattern="/widgets/**" security="none" />
+
+    <!-- api ping -->
     <http pattern="/api/test/**" security="none" />
     <http pattern="/api/ping" security="none" />
+
+    <!-- facebook login and sharing -->
     <http pattern="/api/facebook/login*" security="none" />
     <http pattern="/openGraph/**" security="none" />
     <http pattern="/channel.html" security="none" />
-    <http pattern="/html/privacyPolicy.html" security="none" />
+
+    <!-- api documentation -->
+    <http pattern="/api/api-docs/**" security="none" />
+    <http pattern="/api/api-docs*" security="none" />
+
+    <!-- oauth2 token exchange -->
+    <http pattern="/auth/oauth2/token*" security="none" />
 
     <http pattern="/sreport/" security="none" />
     <http pattern="/sreport/${release}/js/**" security="none" />
@@ -46,16 +61,20 @@
         <http-basic/>
 		<intercept-url pattern="/**" access="hasRole('ROLE_USER')" />
 
+        <custom-filter before="PRE_AUTH_FILTER" ref="oauth2ProcessingFilter" />
 		<custom-filter position="FORM_LOGIN_FILTER" ref="authFilter" />
 		<custom-filter position="LOGOUT_FILTER" ref="logoutFilter" />
-	</http>
+    </http>
+
+    <beans:bean id="oauth2ProcessingFilter"
+                class="org.fluxtream.core.auth.FlxOAuth2ProcessingFilter"/>
 
 	<beans:bean id="logoutFilter"
 		class="org.springframework.security.web.authentication.logout.LogoutFilter">
 		<beans:constructor-arg value="/welcome"></beans:constructor-arg>
 		<beans:constructor-arg>
 			<beans:array>
-				<beans:bean class="org.fluxtream.auth.FlxLogoutHandler">
+				<beans:bean class="org.fluxtream.core.auth.FlxLogoutHandler">
 				</beans:bean>
 			</beans:array>
 		</beans:constructor-arg>
@@ -63,11 +82,11 @@
 	</beans:bean>
 
 	<beans:bean id="loginUrlAuthenticationEntryPoint"
-		class="org.fluxtream.auth.FlxLoginUrlAuthenticationEntryPoint">
+		class="org.fluxtream.core.auth.FlxLoginUrlAuthenticationEntryPoint">
 		<beans:property name="loginFormUrl" value="/welcome" />
 	</beans:bean>
 
-	<beans:bean id="authFilter" class="org.fluxtream.auth.FlxAuthFilter">
+	<beans:bean id="authFilter" class="org.fluxtream.core.auth.FlxAuthFilter">
 		<beans:property name="authenticationManager" ref="authenticationManager" />
 		<beans:property name="authenticationFailureHandler"
 			ref="failureHandler" />
@@ -77,7 +96,7 @@
 	</beans:bean>
 
 	<beans:bean id="successHandler"
-		class="org.fluxtream.auth.FlxSavedRequestAwareAuthenticationSuccessHandler">
+		class="org.fluxtream.core.auth.FlxSavedRequestAwareAuthenticationSuccessHandler">
 		<beans:property name="defaultTargetUrl" value="/checkIn" />
         <beans:property name="targetUrlParameter" value="target" />
 		<beans:property name="alwaysUseDefaultTargetUrl" value="false" />
@@ -90,7 +109,7 @@
         <beans:constructor-arg ref="requestCache"/>
     </beans:bean>
 
-	<beans:bean id="failureHandler" class="org.fluxtream.auth.FlxAuthFailureHandler">
+	<beans:bean id="failureHandler" class="org.fluxtream.core.auth.FlxAuthFailureHandler">
 		<beans:property name="defaultFailureUrl" value="/welcome" />
 	</beans:bean>
 
@@ -102,7 +121,7 @@
 		</authentication-provider>
 	</authentication-manager>
 
-	<beans:bean id="guestService" class="org.fluxtream.auth.FlxUserDetailsService">
+	<beans:bean id="guestService" class="org.fluxtream.core.auth.FlxUserDetailsService">
     </beans:bean>
 
 </beans:beans>

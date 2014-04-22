@@ -1,8 +1,8 @@
-<%@ page import="org.fluxtream.auth.AuthHelper" %>
+<%@ page import="org.fluxtream.core.auth.AuthHelper" %>
 <%@ page pageEncoding="utf-8" contentType="text/html; charset=UTF-8"%><%@ taglib
 	uri="http://granule.com/tags" prefix="g"
 %><%@ page import="java.util.List"
-%><%@ page import="org.fluxtream.domain.Guest"
+%><%@ page import="org.fluxtream.core.domain.Guest"
 %><%
     Boolean tracker = (Boolean)request.getAttribute("tracker");
     Boolean intercom = (Boolean)request.getAttribute("intercom");
@@ -162,6 +162,7 @@
     <script src="/static/js/backbone-1.0.0-custom.1-min.js"></script>
     <script src="/static/js/jquery.ba-dotimeout-1.0.0.min.js"></script>
     <script src="/static/js/jquery.masonry-2.1.03.min.js"></script>
+    <script src="/static/js/moment-2.5.1.min.js"></script>
     <script src="/static/js/jquery.xcolor-1.8.js"></script>
     <script src="/static/js/jquery.outerHTML-1.0.0.js"></script>
 

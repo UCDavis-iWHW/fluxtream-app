@@ -1,19 +1,16 @@
 package org.fluxtream.connectors.fluxtream_capture;
 
-import java.awt.Dimension;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
+import org.fluxtream.core.OutsideTimeBoundariesException;
+import org.fluxtream.core.TimeInterval;
+import org.fluxtream.core.connectors.fluxtream_capture.FluxtreamCapturePhotoFacet;
+import org.fluxtream.core.connectors.vos.AbstractPhotoFacetVO;
+import org.fluxtream.core.domain.GuestSettings;
+import org.fluxtream.core.images.ImageOrientation;
+import org.fluxtream.core.mvc.models.DimensionModel;
+
+import java.awt.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
-import org.fluxtream.OutsideTimeBoundariesException;
-import org.fluxtream.TimeInterval;
-import org.fluxtream.connectors.vos.AbstractPhotoFacetVO;
-import org.fluxtream.domain.GuestSettings;
-import org.fluxtream.images.ImageOrientation;
-import org.fluxtream.mvc.models.DimensionModel;
 
 /**
  * @author Chris Bartley (bartley@cmu.edu)
@@ -34,7 +31,6 @@ public class FluxtreamCapturePhotoFacetVO extends AbstractPhotoFacetVO<Fluxtream
         channelName = "photo";
         UID = facet.getId();
         start = facet.start;
-        startMinute = toMinuteOfDay(new Date(facet.start), timeInterval.getTimeZone(facet.start));
 
         final String photoStoreKey = facet.getPhotoStoreKey();
         photoUrl = "/api/bodytrack/photo/" + photoStoreKey;

@@ -22,31 +22,34 @@ import com.evernote.edam.notestore.SyncState;
 import com.evernote.edam.type.Data;
 import com.evernote.edam.type.Note;
 import com.evernote.edam.type.NoteAttributes;
+import com.evernote.edam.type.NoteSortOrder;
 import com.evernote.edam.type.Notebook;
+import com.evernote.edam.type.Publishing;
 import com.evernote.edam.type.Resource;
 import com.evernote.edam.type.ResourceAttributes;
 import com.evernote.edam.type.Tag;
 import com.evernote.thrift.TException;
-import org.fluxtream.aspects.FlxLogger;
-import org.fluxtream.connectors.Connector;
-import org.fluxtream.connectors.annotations.Updater;
-import org.fluxtream.connectors.location.LocationFacet;
-import org.fluxtream.connectors.updaters.AbstractUpdater;
-import org.fluxtream.connectors.updaters.AuthExpiredException;
-import org.fluxtream.connectors.updaters.RateLimitReachedException;
-import org.fluxtream.connectors.updaters.SettingsAwareUpdater;
-import org.fluxtream.connectors.updaters.SharedConnectorSettingsAwareUpdater;
-import org.fluxtream.connectors.updaters.UpdateInfo;
-import org.fluxtream.domain.ApiKey;
-import org.fluxtream.domain.ChannelMapping;
-import org.fluxtream.domain.SharedConnector;
-import org.fluxtream.services.ApiDataService;
-import org.fluxtream.services.CoachingService;
-import org.fluxtream.services.JPADaoService;
-import org.fluxtream.services.MetadataService;
-import org.fluxtream.services.SettingsService;
-import org.fluxtream.services.impl.BodyTrackHelper;
-import org.fluxtream.utils.JPAUtils;
+import org.codehaus.plexus.util.ExceptionUtils;
+import org.fluxtream.core.aspects.FlxLogger;
+import org.fluxtream.core.connectors.Connector;
+import org.fluxtream.core.connectors.annotations.Updater;
+import org.fluxtream.core.connectors.location.LocationFacet;
+import org.fluxtream.core.connectors.updaters.AbstractUpdater;
+import org.fluxtream.core.connectors.updaters.AuthExpiredException;
+import org.fluxtream.core.connectors.updaters.RateLimitReachedException;
+import org.fluxtream.core.connectors.updaters.SettingsAwareUpdater;
+import org.fluxtream.core.connectors.updaters.SharedConnectorSettingsAwareUpdater;
+import org.fluxtream.core.connectors.updaters.UpdateInfo;
+import org.fluxtream.core.domain.ApiKey;
+import org.fluxtream.core.domain.ChannelMapping;
+import org.fluxtream.core.domain.SharedConnector;
+import org.fluxtream.core.services.ApiDataService;
+import org.fluxtream.core.services.CoachingService;
+import org.fluxtream.core.services.JPADaoService;
+import org.fluxtream.core.services.MetadataService;
+import org.fluxtream.core.services.SettingsService;
+import org.fluxtream.core.services.impl.BodyTrackHelper;
+import org.fluxtream.core.utils.JPAUtils;
 import com.syncthemall.enml4j.ENMLProcessor;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
@@ -571,6 +574,7 @@ public class EvernoteUpdater extends AbstractUpdater implements SettingsAwareUpd
                             facet.htmlContent = htmlContent;
                         } catch (Throwable t) {
                             logger.warn("error parsing enml note: " + t.getMessage());
+                            System.out.println(ExceptionUtils.getStackTrace(t));
                             facet.htmlContent = "Sorry, there was an error parsing this note (" + t.getMessage() +")";
                         }
                     }
@@ -872,8 +876,17 @@ public class EvernoteUpdater extends AbstractUpdater implements SettingsAwareUpd
                 }
                 if (notebook.isSetServiceUpdated())
                     facet.serviceUpdated = notebook.getServiceUpdated();
-                if (notebook.isSetPublishing())
-                    facet.publishing = notebook.getPublishing();
+                if (notebook.isSetPublishing()) {
+                    final Publishing publishing = notebook.getPublishing();
+                    if (publishing.isSetOrder()) {
+                        final NoteSortOrder order = publishing.getOrder();
+                        facet.publishingNoteOrderValue = order.getValue();
+                    }
+                    if (publishing.isSetUri())
+                        facet.publishingUri = publishing.getUri();
+                    if (publishing.isSetPublicDescription())
+                        facet.publishingPublicDescription = publishing.getPublicDescription();
+                }
                 if (notebook.isSetPublished())
                     facet.published = notebook.isPublished();
                 if (notebook.isSetStack())

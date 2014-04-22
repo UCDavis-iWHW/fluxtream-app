@@ -45,6 +45,30 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
             }
         });
         Builder.init(App, this);
+        App.addDataUpdatesListener("calendarAppApiDataUpdateListener",function(update){
+            if (update.apiData != null && Calendar.digest != null){
+                var digestTimestamp = Calendar.digest.generationTimestamp;
+                var stateToRequest = Calendar.timespanState;
+                var connectorsToRefresh = [];
+                for (var connector in update.apiData){
+                    for (var objectType in update.apiData[connector]){
+                        if ((update.apiData[connector][objectType].start < Calendar.digest.tbounds.end && update.apiData[connector][objectType].start >= Calendar.digest.tbounds.start) ||
+                            (update.apiData[connector][objectType].end <= Calendar.digest.tbounds.end && update.apiData[connector][objectType].end > Calendar.digest.tbounds.start) ||
+                            (update.apiData[connector][objectType].start <= Calendar.digest.tbounds.start && update.apiData[connector][objectType].end >= Calendar.digest.tbounds.end)){
+                            connectorsToRefresh.push(update.connectorInfo[connector].apiKeyId + "-" + objectType);
+                        }
+                    }
+                }
+                $.ajax("/api/calendar/" + connectorsToRefresh.join(",") + "/" + stateToRequest,{
+                    success:function(result){
+                        Calendar.mergeInFacets(result.facets,update.connectorInfo)
+                    },
+                    error:function(){
+                        console.error(arguments);
+                    }
+                });
+            }
+        });
 	};
 
 	Calendar.initialize = function () {
@@ -82,33 +106,6 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
     }
 
     Calendar.stopLoading = stopLoading;
-
-    Calendar.fetchState = function(url, params) {
-        startLoading();
-        $.ajax({
-           url: url,
-           type: "GET",
-           data: params,
-           dataType: "JSON",
-           success: function(response) {
-               if (response.result == "KO"){//signifies error was returned
-                   handleError("You aren't logged in!")();
-                   return;
-               }
-               Calendar.timeRange.start = response.start;
-               Calendar.timeRange.end = response.end;
-               if (Calendar.dateAxisCursorPosition * 1000 < Calendar.timeRange.start || Calendar.dateAxisCursorPosition * 1000 > Calendar.timeRange.end)
-                   Calendar.dateAxisCursorPosition = null;
-               updateTimespan(response.currentTimespanLabel,params);
-               Calendar.timeRange.updated = true;
-               Calendar.navigateState(Calendar.currentTabName + "/" + response.state);
-               // TODO: Change visible date in the datepicker to Sunday
-               // TODO: Would be nice to use updateDatepicker, but what's the state argument?
-               //stopLoading is now called by the tab once it's done processing the data.
-           },
-           error: handleError("failed to fetch next calendar state!")
-        });
-    }
 
     Calendar.parseState = function(state) {
         var splits = state.split("/");
@@ -158,31 +155,16 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
     };
 
     Calendar.renderDefaultState = function() {
-        Calendar.fetchState("/api/calendar/nav/setToToday", {timeUnit: "DAY"});
+        Calendar.navigateState("clock/date/"+moment().format("YYYY-MM-DD"));
     };
 
-    function fetchTimespan(state,doneLoadingId) {
-        $.ajax({
-            url: "/api/calendar/nav/model",
-            async: false,
-            type: "GET",
-            data: {state: state.tabState},
-            dataType: "JSON",
-            success: function(response) {
-                if (response.result == "KO"){//signifies error was returned
-                    handleError("You aren't logged in!")();
-                    return;
-                }
-                Calendar.timeRange.start = response.start;
-                Calendar.timeRange.end = response.end;
-                if (Calendar.dateAxisCursorPosition * 1000 < Calendar.timeRange.start || Calendar.dateAxisCursorPosition * 1000 > Calendar.timeRange.end)
-                    Calendar.dateAxisCursorPosition = null;
-                updateTimespan(response.currentTimespanLabel,state.tabState);
-                Calendar.timeRange.updated = true;
-                stopLoading(doneLoadingId);
-            },
-            error: handleError("failed to fetch timespan label!")
-        });
+    function updateTimeRange(digest, state) {
+        Calendar.timeRange.start = digest.calendar.start;
+        Calendar.timeRange.end = digest.calendar.end;
+        if (Calendar.dateAxisCursorPosition * 1000 < Calendar.timeRange.start || Calendar.dateAxisCursorPosition * 1000 > Calendar.timeRange.end)
+            Calendar.dateAxisCursorPosition = null;
+        updateTimespan(digest.calendar.currentTimespanLabel,state.tabState);
+        Calendar.timeRange.updated = true;
     }
 
     function fetchWeatherData() {
@@ -224,7 +206,7 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
             // the FlxState routes invoke renderState() directly instead of going
             // through fetchState. That bypasses the timespan label fetching, so we
             // need to do that here.
-            fetchTimespan(state);
+            //fetchTimespan(state);
             //stopLoading();
         }
         var tabChanged = Calendar.tabState === state.tabState;
@@ -268,7 +250,7 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
             case "week":
                 return DateUtils.getDateRangeForWeek(state.year, state.week)[0];
             case "month":
-                return new Date(state.year,state.month-1,1,0,0,0,0);
+                return new Date(state.year,state.month,1,0,0,0,0);
             case "year":
                 return new Date(state.year,0,1,0,0,0,0);
         }
@@ -301,6 +283,7 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
                     return;
                 }
                 Calendar.digest = response;
+                updateTimeRange(response, state);
                 Calendar.digestTabState = state.tabState;
                 if (thisFetchId != fetchId)
                     return;
@@ -316,7 +299,7 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
                 Builder.updateTab(Calendar.digest, Calendar); //TODO: shouldn't be calling this twice really
                 if (thisFetchId != fetchId)
                     return;
-                Builder.handleNotifications(response);
+                App.handleNotificationList(response.notifications);
                 if (Calendar.timeUnit==="date") {
                     $(".ephemerisWrapper").show();
                     handleCityInfo(response);
@@ -336,9 +319,45 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
 		});
 	}
 
+    function addTimeInfo(facet){
+        function pad(i){
+           var is = ""+i;
+           if (is.length<2) is = "0"+i;
+           return is;
+        }
+        for (var member in facet){
+            switch (member){
+                case "eventStart":
+                    var eventStart = moment(facet[member], "YYYYMMDD'T'HHmmss.SSSZ");
+                    facet.startMinute = eventStart.hour()*60+eventStart.minute();
+                    facet.startTime = {"hours" : eventStart.hour()>12?eventStart.hour()-12:eventStart.hour(), "minutes" : pad(eventStart.minute()), "ampm" : eventStart.hour()>12?"pm":"am"};
+                    facet.time = App.formatMinuteOfDay(facet.startMinute)[0];
+                    facet.ampm = App.formatMinuteOfDay(facet.startMinute)[1];
+                    facet.start = eventStart.utc().valueOf();
+                    facet.date = DateUtils.constrainDate(eventStart, Calendar.digest.calendar.state);
+                    break;
+                case "eventEnd":
+                    var eventEnd = moment(facet[member], "YYYYMMDD'T'HHmmss.SSSZ");
+                    facet.endMinute = eventEnd.hour()*60+eventEnd.minute();
+                    facet.endTime = {"hours" : eventEnd.hour()>12?eventEnd.hour()-12:eventEnd.hour(), "minutes" : pad(eventEnd.minute()), "ampm" : eventEnd.hour()>12?"pm":"am"};
+                    facet.end = eventEnd.utc().valueOf();
+                    break;
+            }
+        }
+        if (facet.type.indexOf("moves-")!=-1&&typeof(facet.activities)!="undefined"){
+           for (var i=0; i<facet.activities.length;i++) {
+               addTimeInfo(facet.activities[i]);
+           }
+        }
+    }
+
     Calendar.processFacets = function(facets){
         if (facets == null || facets.length == 0 || facets[0].getDetails != null)
             return;
+        for (var i = 0; i < facets.length; i++){
+            var data = facets[i];
+            addTimeInfo(data);
+        }
         for (var i = 0, li = facets.length; i < li; i++){
             var facet = facets[i];
             facet.getDetails = function(array,showDate){
@@ -470,18 +489,22 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
         if (typeof(digest.settings.messageDisplayCounters)!="undefined") {
             App.setupBeginnersFriendlyUI(digest.settings.messageDisplayCounters, digest.nApis);
         }
-        digest.getConsensusCitiesList = function(){
-            if (digest.metadata.timeUnit === "DAY")
-                return [digest.metadata.mainCity];
-            return digest.metadata.consensusCities;
-        };
-        digest.getCitiesList = function(){
-            if (digest.metadata.timeUnit === "DAY")
-                return [digest.metadata.mainCity];
-            return digest.metadata.cities;
-        };
+        if (digest.getConsensusCitiesList == null){
+            digest.getConsensusCitiesList = function(){
+                if (digest.metadata.timeUnit === "DAY")
+                    return [digest.metadata.mainCity];
+                return digest.metadata.consensusCities;
+            };
+            digest.getCitiesList = function(){
+                if (digest.metadata.timeUnit === "DAY")
+                    return [digest.metadata.mainCity];
+                return digest.metadata.cities;
+            };
+        }
         var templatePath = "applications/calendar/facetTemplates.html";
         function loadTemplate(name) {
+            if (Calendar.detailsTemplates[name] != null)
+                return;
             App.loadMustacheTemplate(templatePath, name, function(template){
                 if (template == null) {
                     console.log("WARNING: no template found for " + name + ".");
@@ -497,21 +520,24 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
         loadTemplate("fluxtream-address");
         loadTemplate("foursquare-venue");
         loadTemplate("moves-move-activity");
-        for (var connectorId in digest.cachedData){
-            Calendar.processFacets(digest.cachedData[connectorId]);
-            digest.cachedData[connectorId].hasImages = false;
+        for (var connectorId in digest.facets){
+            if (digest.facets[connectorId].processed === true)
+                continue;
+            digest.facets[connectorId].processed = true;
+            Calendar.processFacets(digest.facets[connectorId]);
+            digest.facets[connectorId].hasImages = false;
             switch (connectorId){
                 case "evernote-photo":
                 case "up-serving":
                 case "picasa-photo":
                 case "flickr-photo":
                 case "fluxtream_capture-photo":
-                    digest.cachedData[connectorId].hasImages = true;
+                    digest.facets[connectorId].hasImages = true;
                     break;
                 case "mymee-observation":
                 case "sms_backup-sms":
-                    for (var i = 0; i < digest.cachedData[connectorId].length && !digest.cachedData[connectorId].hasImages; i++){
-                        digest.cachedData[connectorId].hasImages = digest.cachedData[connectorId][i].hasImage;
+                    for (var i = 0; i < digest.facets[connectorId].length && !digest.facets[connectorId].hasImages; i++){
+                        digest.facets[connectorId].hasImages = digest.facets[connectorId][i].hasImage;
                     }
                     break;
             }
@@ -521,22 +547,22 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
             var hasGeneralSettings = false;
             if (typeof(config.hasGeneralSettings)!="undefined"&&config.hasGeneralSettings)
                 hasGeneralSettings = true;
-            for (var i = 0; i < digest.cachedData[connectorId].length; i++){
-                var facet = digest.cachedData[connectorId][i];
+            for (var i = 0; i < digest.facets[connectorId].length; i++){
+                var facet = digest.facets[connectorId][i];
                 if (typeof(config.isFilteredOut)!="undefined"&&config.isFilteredOut!=null) {
                     var filteredOut = config.isFilteredOut(facet, digest.settings.connectorSettings);
                     if (filteredOut) {
-                        digest.cachedData[connectorId].splice(i, 1);
+                        digest.facets[connectorId].splice(i, 1);
                         i = -1;
                         continue;
                     }
                 }
             }
-            for (var i = 0; i < digest.cachedData[connectorId].length; i++){
-                var facet = digest.cachedData[connectorId][i];
+            for (var i = 0; i < digest.facets[connectorId].length; i++){
+                var facet = digest.facets[connectorId][i];
                 if (hasGeneralSettings && config.applySettings != null)
                     config.applySettings(facet, digest.settings.connectorSettings);
-                if (digest.cachedData[connectorId].hasImages){
+                if (digest.facets[connectorId].hasImages){
                     switch (connectorId){
                         case "picasa-photo":
                         case "flickr-photo":
@@ -565,7 +591,7 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
                                 }
                             }
                             if (bestMatch != -1){
-                                photo42 = digest.cachedData[connectorId][i].thumbnailUrls[bestMatch];
+                                photo42 = digest.facets[connectorId][i].thumbnailUrls[bestMatch];
                             }
                         }
                         facet.photo42 = photo42;
@@ -608,6 +634,36 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
         }
     }
 
+    Calendar.mergeInFacets = function(newFacetsArray,connectorInfos){
+        if (newFacetsArray.length == 0)
+            return;
+        //merge in the selected connectors
+        for (var member in connectorInfos){
+            var connectorInfo = connectorInfos[member];
+            var inserted = false;
+            for (var i = 0, li = Calendar.digest.selectedConnectors.length; i < li && !inserted; i++){
+                if (Calendar.digest.selectedConnectors[i].apiKeyId == connectorInfo.apiKeyId){
+                    Calendar.digest.selectedConnectors[i] = connectorInfo;
+                    inserted = true;
+                }
+            }
+            if (!inserted){
+                Calendar.digest.selectedConnectors.push(connectorInfo);
+                Calendar.digest.nApis++;
+            }
+
+        }
+        for (var facetTypeId in newFacetsArray){//add all the new facets into the cached data
+            Calendar.digest.cachedData[facetTypeId] = newFacetsArray[facetTypeId];
+        }
+        enhanceDigest(Calendar.digest);
+        processDigest(Calendar.digest);//this will update the button states for any changes we made
+        Calendar.digest.generationTimestamp = new Date().getTime();
+        Calendar.digest.delta = true;
+        Builder.updateTab(Calendar.digest, Calendar);
+        Calendar.digest.delta = false;
+    }
+
     function shouldFacetsGroup(facet1, facet2){
         if (facet1.type != facet2.type)
             return false;
@@ -627,22 +683,20 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
     * @param digest
     */
     function processDigest(digest){
-        $.each(Builder.getConnectorNames(), function(i, connectorName) {
-            var buttonLink = Builder.getConnectorButton(connectorName),
+        $.each(digest.selectedConnectors, function(i, connector) {
+            var buttonLink = Builder.getConnectorButton(connector,Calendar),
                 button = buttonLink.parent();
             button.hide();
-        });
-        $.each(digest.selectedConnectors, function(i, connector) {
             var connectorConfig = App.getConnectorConfig(connector.connectorName);
             var connected = _.some(connector.facetTypes, function(facetType) {
-                var hasTypedFacets = digest.cachedData[facetType] != null;
+                var hasTypedFacets = digest.facets[facetType] != null;
                 //var objectType = facetType.split("-")[1];
                 if(Calendar.currentTab.name==="photos") {
                     // handle special case of mymee observations
                     //if (hasTypedFacets&&objectType.indexOf("observation")!=-1){
                     //    hasTypedFacets = false;
-                    //    for (var i=0;i<digest.cachedData[facetType].length; i++){
-                    //        if (typeof(digest.cachedData[facetType][i].photoUrl)!="undefined") {
+                    //    for (var i=0;i<digest.facets[facetType].length; i++){
+                    //        if (typeof(digest.facets[facetType][i].photoUrl)!="undefined") {
                     //            hasTypedFacets = true;
                     //            break;
                     //        }
@@ -654,7 +708,7 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
                     //    hasTypedFacets = hasTypedFacets && (isPhotoObjectType || isServingObjectType);
                     //
                     //}
-                    hasTypedFacets = hasTypedFacets && digest.cachedData[facetType].hasImages;
+                    hasTypedFacets = hasTypedFacets && digest.facets[facetType].hasImages;
                 }
                 return hasTypedFacets;
             });
@@ -664,8 +718,6 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
 
             filterLabel = filterLabel.replace("_", " ");
 
-            var buttonLink = Builder.getConnectorButton(connector.connectorName),
-                button = buttonLink.parent();
             buttonLink
                 .toggleClass("flx-disconnected", !connected)
                 .text(filterLabel);
@@ -767,10 +819,6 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
                                 break;
                         }
                         break;
-                    case "startMinute":
-                        newFacet.time = App.formatMinuteOfDay(data[member])[0];
-                        newFacet.ampm = App.formatMinuteOfDay(data[member])[1];
-                        break;
                     case "userName":
                         newFacet[member] = data[member];
                         break;
@@ -798,9 +846,15 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
                         newFacet.hasPosition = true;
                         break;
                     case "uri":
-                        var parts = data[member].split("/");
+                        var parts = data.uri.split("/");
                         if (parts.length == 2){
-                            params.iconClass = "-activity " + parts[0];
+                            if (data.source==="MOVES") {
+                                var activityCode = "generic";
+                                if (_.contains(["transport","cycling","running","walking"],parts[0]))
+                                    activityCode = parts[0];
+                                params.iconClass = "-activity " + activityCode;
+                            } else
+                                params.iconClass = "-activity " + parts[0];
                         }
                         break;
                     case "smsType":
@@ -868,11 +922,11 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
     }
 
     function getFacet(facetType, facetId){
-        var cachedData = Calendar.digest.cachedData[facetType];
+        var facets = Calendar.digest.facets[facetType];
         var facet = null;
-        for (var i = 0, li = cachedData.length; i < li; i++){
-            if (cachedData[i].id == facetId){
-                facet = cachedData[i];
+        for (var i = 0, li = facets.length; i < li; i++){
+            if (facets[i].id == facetId){
+                facet = facets[i];
                 break;
             }
         }
@@ -963,6 +1017,8 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
 
     Calendar.rebindDetailsControls = function(details,facetList){
         function getFacet(facetType,facetId){
+            if (typeof(facetType)==="undefined")
+                return;
             try{
                 for (var i = 0, li = facetList.length; i < li; i++){
                     if (facetList[i].type === facetType && facetList[i].id === facetId)
@@ -1413,11 +1469,6 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
             Calendar.timeUnit = state.timeUnit;
             Builder.createTabs(Calendar);
             updateDisplays(state);
-            updated = true;
-        }
-        if (state.tabState !== Calendar.tabState) {
-            Calendar.tabState = state.tabState;
-            fetchTimespan(state);
             updated = true;
         }
         if (updated) {

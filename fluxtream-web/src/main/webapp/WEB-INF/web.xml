@@ -83,11 +83,16 @@
         <url-pattern>/combined.css</url-pattern>
     </servlet-mapping>
     <servlet>
+        <servlet-name>Bootstrap</servlet-name>
+        <servlet-class>org.fluxtream.core.api.SwaggerBootstrapServlet</servlet-class>
+        <load-on-startup>2</load-on-startup>
+    </servlet>
+    <servlet>
         <servlet-name>jersey</servlet-name>
         <servlet-class>com.sun.jersey.spi.spring.container.servlet.SpringServlet</servlet-class>
         <init-param>
             <param-name>com.sun.jersey.config.property.packages</param-name>
-            <param-value>org.fluxtream.api;org.fluxtream.connectors.api</param-value>
+            <param-value>org.fluxtream.api;org.fluxtream.connectors.api;com.wordnik.swagger.jersey.listing</param-value>
         </init-param>
         <init-param>
             <param-name>com.sun.jersey.api.json.POJOMappingFeature</param-name>
@@ -101,6 +106,7 @@
             <param-name>com.sun.jersey.spi.container.ContainerResponseFilters</param-name>
             <param-value>com.sun.jersey.api.container.filter.GZIPContentEncodingFilter</param-value>
         </init-param>
+        <load-on-startup>2</load-on-startup>
     </servlet>
     <servlet>
         <servlet-name>springmvc</servlet-name>
@@ -109,12 +115,12 @@
     </servlet>
 
     <servlet-mapping>
-        <servlet-name>jersey</servlet-name>
-        <url-pattern>/api/*</url-pattern>
+        <servlet-name>Bootstrap</servlet-name>
+        <url-pattern>/bootstrap/*</url-pattern>
     </servlet-mapping>
     <servlet-mapping>
         <servlet-name>jersey</servlet-name>
-        <url-pattern>/rest/*</url-pattern>
+        <url-pattern>/api/*</url-pattern>
     </servlet-mapping>
 
     <servlet-mapping>

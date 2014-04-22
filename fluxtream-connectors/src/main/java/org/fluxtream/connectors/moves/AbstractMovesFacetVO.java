@@ -1,19 +1,18 @@
 package org.fluxtream.connectors.moves;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
-import org.fluxtream.TimeUnit;
+import org.fluxtream.core.OutsideTimeBoundariesException;
+import org.fluxtream.core.TimeInterval;
+import org.fluxtream.core.TimeUnit;
+import org.fluxtream.core.connectors.vos.AbstractTimedFacetVO;
+import org.fluxtream.core.domain.GuestSettings;
+import org.fluxtream.core.mvc.models.DurationModel;
 import org.joda.time.DateTimeConstants;
 import org.joda.time.DateTimeZone;
 import org.joda.time.LocalDate;
-
-import org.fluxtream.OutsideTimeBoundariesException;
-import org.fluxtream.TimeInterval;
-import org.fluxtream.connectors.vos.AbstractTimedFacetVO;
-import org.fluxtream.domain.GuestSettings;
-import org.fluxtream.mvc.models.DurationModel;
+import org.joda.time.format.ISODateTimeFormat;
 
 /**
  * User: candide
@@ -64,30 +63,24 @@ public abstract class AbstractMovesFacetVO<T extends MovesFacet> extends Abstrac
             // Check if crosses leading midnight
             if(facet.start<dateStart) {
                 this.start = dateStart;
-                this.startMinute = 0;
             }
             else {
                 this.start = facet.start;
-                this.startMinute = toMinuteOfDay(new Date(facet.start), timeZone);
             }
 
             // Check if crosses trailing midnight
             if(facet.end>=dateEnd) {
                 this.end = dateEnd-1;
-                this.endMinute = DateTimeConstants.MINUTES_PER_HOUR*DateTimeConstants.HOURS_PER_DAY - 1;
             }
             else {
                 this.end = facet.end;
-                this.endMinute = toMinuteOfDay(new Date(facet.end), timeZone);
             }
         }
         else {
             // This is not a date-based query.  Don't do any trimming.
             this.start = facet.start;
-            this.startMinute = toMinuteOfDay(new Date(facet.start), timeZone);
 
             this.end = facet.end;
-            this.endMinute = toMinuteOfDay(new Date(facet.end), timeZone);
         }
 
         // Calculate duration from the potentially truncated times
@@ -100,19 +93,26 @@ public abstract class AbstractMovesFacetVO<T extends MovesFacet> extends Abstrac
             // Only include activities which overlap at least part of this date
             // This comparison looks funny, but it is true if there is any overlap
             // between the time range of the activity and this date
-            if(timeInterval.getTimeUnit()== TimeUnit.ARBITRARY || activity.start<dateEnd || activity.end>dateStart) {
-                try {
-                    activities.add(new MovesActivityVO(activity, timeZone,
-                                                    dateStart, dateEnd, settings,
-                                                    timeInterval.getTimeUnit()!= TimeUnit.ARBITRARY));
-                } catch (OutsideTimeBoundariesException e) {
-                    // Don't negate the entire move facet if a particular activity falls outside
-                    // the date boundary, just ignore that individual activity
-                    skippedActivities++;
+            if (activity.manual)
+                // always add manual activities
+                activities.add(new MovesActivityVO(activity, timeZone,
+                                                   dateStart, dateEnd, settings, false));
+            else
+                if(timeInterval.getTimeUnit()== TimeUnit.ARBITRARY || activity.start<dateEnd || activity.end>dateStart) {
+                    try {
+                        activities.add(new MovesActivityVO(activity, timeZone,
+                                                        dateStart, dateEnd, settings,
+                                                        timeInterval.getTimeUnit()!= TimeUnit.ARBITRARY));
+                    } catch (OutsideTimeBoundariesException e) {
+                        // Don't negate the entire move facet if a particular activity falls outside
+                        // the date boundary, just ignore that individual activity
+                        skippedActivities++;
+                    }
                 }
-            }
         }
         hasActivities = facet.getActivities().size()>0;
+        this.eventStart = ISODateTimeFormat.basicDateTime().withZone(DateTimeZone.forTimeZone(timeInterval.getTimeZone(facet.start))).print(facet.start);
+        this.eventEnd = ISODateTimeFormat.basicDateTime().withZone(DateTimeZone.forTimeZone(timeInterval.getTimeZone(facet.end))).print(facet.end);
     }
 
 }
