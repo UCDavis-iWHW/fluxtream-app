@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <title>Fluxtream Self Report</title>
     <link href="${release}/css/styles.css" rel="stylesheet">
+
     <script type="text/javascript" src="${release}/js/welcome.js"></script>
     <link rel="shortcut icon" href="/favicon.ico">
 </head>

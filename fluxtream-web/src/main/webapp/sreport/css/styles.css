@@ -165,7 +165,7 @@ table {
     padding: 2%;
     margin: 0em;
     background: rgba(0, 0, 0, 0.29);
-    border: 1px solid black;
+    border: 0px;
 }
 
 #footer {

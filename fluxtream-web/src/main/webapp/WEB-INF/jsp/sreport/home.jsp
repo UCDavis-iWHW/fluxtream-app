@@ -1,19 +1,26 @@
 <!DOCTYPE html>
-<html>
+<html ng-app="selfReportApp">
 <head>
     <link rel="stylesheet" type="text/css" href="${release}/css/styles.css">
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
     <script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
     <script src="http://code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
-    <script src="${release}/js/home.js"></script>
+
+    <script src="${release}/js/angular.js"></script>
+    <script src="${release}/js/angular-route.js"></script>
 
     <meta charset="UTF-8">
 
-    <script> var release = ${release} </script>
+    <script> var release = '${release}'; </script>
+
+    <script src="${release}/js/selfReportApp.js"></script>
+    <script src="${release}/js/controllers.js"></script>
+
 </head>
 <body>
 <div class="flex-container">
+
     <div class="flex-item-header" style="height: 10vh; padding: 0em;">
         <div class="inline" style="width: 100%; position: fixed;">
             <div style="background: #FF9226; width: 33.3333333%; height: 10vh; float:left; padding: 0em; margin: 0em; text-align: left;">
@@ -24,7 +31,12 @@
                 <a href="/logout"><img id="logoutImage" src="${release}/images/exit.png" height="50%" style="padding-top:3%; padding-right: 15%"></a></div>
         </div>
     </div>
+
+    <!-- Placeholder for the views -->
+    <div ng-view> </div>
+
 </div>
+
 <p> </p>
 <div id="footer">
     <div style="background: #FF9226; width: 50%; height: 10vh; float:left; padding: 0em; margin: 0em; text-align: left;">

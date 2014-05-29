@@ -1,0 +1,11 @@
+<div data-ng-repeat="topic in topics">
+    <a href="/sreport/home/createObservation/{{topic.id}}">
+        <div class='flex-item' style='width: 70%; float:left; padding: 0em; margin: 0em; line-height: 10vh;'>
+            {{topic.name}}
+        </div>
+
+        <div class='flex-item' style="width: 30%; line-height: 10vh; float:left; padding: 0em; margin: 0em; text-align: right;">
+            {{observations[topic.id].value}}
+        </div>
+    </a>
+</div>
