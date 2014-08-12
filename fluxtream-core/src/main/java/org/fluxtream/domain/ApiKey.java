@@ -153,6 +153,7 @@ public class ApiKey extends AbstractEntity {
 		ApiKeyAttribute attribute = getAttribute(key);
 		if (attribute==null) return;
 		attribute.attributeKey = null;
+        attribute.apiKey = null;
 		attributes.remove(attribute);
 	}
 
