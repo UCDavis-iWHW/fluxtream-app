@@ -1,33 +1,34 @@
 package org.fluxtream.connectors.controllers;
 
-import java.io.IOException;
-import java.net.URLEncoder;
-import java.util.HashMap;
-import java.util.Map;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import org.fluxtream.Configuration;
-import org.fluxtream.aspects.FlxLogger;
-import org.fluxtream.auth.AuthHelper;
-import org.fluxtream.connectors.Connector;
-import org.fluxtream.connectors.OAuth2Helper;
-import org.fluxtream.domain.ApiKey;
-import org.fluxtream.domain.Guest;
-import org.fluxtream.domain.Notification;
-import org.fluxtream.mvc.controllers.ErrorController;
-import org.fluxtream.services.ConnectorUpdateService;
-import org.fluxtream.services.GuestService;
-import org.fluxtream.services.NotificationsService;
-import org.fluxtream.services.SystemService;
-import org.fluxtream.utils.HttpUtils;
-import org.fluxtream.utils.UnexpectedHttpResponseCodeException;
 import net.sf.json.JSONObject;
 import org.codehaus.plexus.util.ExceptionUtils;
+import org.fluxtream.core.Configuration;
+import org.fluxtream.core.aspects.FlxLogger;
+import org.fluxtream.core.auth.AuthHelper;
+import org.fluxtream.core.connectors.Connector;
+import org.fluxtream.core.connectors.OAuth2Helper;
+import org.fluxtream.core.domain.ApiKey;
+import org.fluxtream.core.domain.Guest;
+import org.fluxtream.core.domain.Notification;
+import org.fluxtream.core.services.ConnectorUpdateService;
+import org.fluxtream.core.services.GuestService;
+import org.fluxtream.core.services.NotificationsService;
+import org.fluxtream.core.services.SystemService;
+import org.fluxtream.core.utils.HttpUtils;
+import org.fluxtream.core.utils.UnexpectedHttpResponseCodeException;
+import org.fluxtream.mvc.controllers.ErrorController;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.util.HashMap;
+import java.util.Map;
 
 @Controller
 @RequestMapping(value = "/google/oauth2")
@@ -181,7 +182,7 @@ public class GoogleOAuth2Controller {
                                                      message);
                 // Record permanent failure since this connector won't work again until
                 // it is reauthenticated
-                guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_PERMANENT_FAILURE, null);
+                guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_PERMANENT_FAILURE, null, ApiKey.PermanentFailReason.NEEDS_REAUTH);
                 return new ModelAndView("redirect:/app");
             }
 
@@ -232,7 +233,7 @@ public class GoogleOAuth2Controller {
                                         + encodedRefreshToken);
 
         // Record this connector as having status up
-        guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_UP, null);
+        guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_UP, null, null);
         // Schedule an update for this connector
         connectorUpdateService.updateConnector(apiKey, false);
 

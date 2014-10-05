@@ -1,31 +1,5 @@
 package org.fluxtream.connectors.up;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.TimeZone;
-import java.util.TreeSet;
-import org.fluxtream.TimezoneMap;
-import org.fluxtream.connectors.ObjectType;
-import org.fluxtream.connectors.annotations.Updater;
-import org.fluxtream.connectors.location.LocationFacet;
-import org.fluxtream.connectors.updaters.AbstractUpdater;
-import org.fluxtream.connectors.updaters.UpdateFailedException;
-import org.fluxtream.connectors.updaters.UpdateInfo;
-import org.fluxtream.domain.AbstractFacet;
-import org.fluxtream.domain.ChannelMapping;
-import org.fluxtream.services.ApiDataService;
-import org.fluxtream.services.JPADaoService;
-import org.fluxtream.services.MetadataService;
-import org.fluxtream.services.impl.BodyTrackHelper;
-import org.fluxtream.utils.HttpUtils;
-import org.fluxtream.utils.TimespanSegment;
-import org.fluxtream.utils.UnexpectedHttpResponseCodeException;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.apache.commons.io.IOUtils;
@@ -37,6 +11,24 @@ import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.BasicResponseHandler;
 import org.apache.log4j.Logger;
+import org.fluxtream.core.TimezoneMap;
+import org.fluxtream.core.connectors.ObjectType;
+import org.fluxtream.core.connectors.annotations.Updater;
+import org.fluxtream.core.connectors.location.LocationFacet;
+import org.fluxtream.core.connectors.updaters.AbstractUpdater;
+import org.fluxtream.core.connectors.updaters.AuthExpiredException;
+import org.fluxtream.core.connectors.updaters.UpdateFailedException;
+import org.fluxtream.core.connectors.updaters.UpdateInfo;
+import org.fluxtream.core.domain.AbstractFacet;
+import org.fluxtream.core.domain.ApiKey;
+import org.fluxtream.core.domain.ChannelMapping;
+import org.fluxtream.core.services.ApiDataService;
+import org.fluxtream.core.services.JPADaoService;
+import org.fluxtream.core.services.MetadataService;
+import org.fluxtream.core.services.impl.BodyTrackHelper;
+import org.fluxtream.core.utils.HttpUtils;
+import org.fluxtream.core.utils.TimespanSegment;
+import org.fluxtream.core.utils.UnexpectedHttpResponseCodeException;
 import org.joda.time.DateTimeConstants;
 import org.joda.time.DateTimeZone;
 import org.joda.time.LocalDate;
@@ -45,6 +37,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
+
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.*;
 
 /**
  * User: candide
@@ -56,6 +54,7 @@ import org.springframework.stereotype.Component;
                                                                  JawboneUpSleepFacet.class, JawboneUpMealFacet.class,
                                                                  JawboneUpServingFacet.class, JawboneUpWorkoutFacet.class},
          defaultChannels = {"Jawbone_UP.intensity", "Jawbone_UP.sleep"},
+         deviceNickname = "Jawbone_UP",
          deleteOrder= {1, 2, 4, 8, 32, 16}, bodytrackResponder = JawboneUpBodytrackResponder.class)
 public class JawboneUpUpdater extends AbstractUpdater {
 
@@ -756,7 +755,7 @@ public class JawboneUpUpdater extends AbstractUpdater {
         throw new RuntimeException("Error calling Jawbone API: this statement should have never been reached");
     }
 
-    private void refreshToken(UpdateInfo updateInfo) throws IOException, UnexpectedHttpResponseCodeException {
+    private void refreshToken(UpdateInfo updateInfo) throws IOException, UnexpectedHttpResponseCodeException, UpdateFailedException {
         String refreshToken = guestService.getApiKeyAttribute(updateInfo.apiKey, "refreshToken");
         Map<String,String> parameters = new HashMap<String,String>();
         parameters.put("grant_type", "refresh_token");
@@ -770,6 +769,10 @@ public class JawboneUpUpdater extends AbstractUpdater {
         final String json = HttpUtils.fetch("https://jawbone.com/auth/oauth2/token", parameters);
 
         JSONObject token = JSONObject.fromObject(json);
+        if (!token.has("access_token")) {
+            final String message = "Couldn't renew access token (no \"access_token\" field in JSON response)";
+            throw new UpdateFailedException(message, new Exception(), true, ApiKey.PermanentFailReason.unknownReason(message));
+        }
         final String accessToken = token.getString("access_token");
         // store the new secret
         guestService.setApiKeyAttribute(updateInfo.apiKey,
@@ -793,12 +796,18 @@ public class JawboneUpUpdater extends AbstractUpdater {
                 JSONObject meta = errorJson.getJSONObject("meta");
                 if (meta.has("error_type")) {
                     String details = meta.has("error_detail") ? meta.getString("error_details") : "Unknown Error (no details provided)";
-                    throw new UpdateFailedException(message + " - " + details, true);
+                    throw new UpdateFailedException(message + " - " + details, true, ApiKey.PermanentFailReason.unknownReason(details));
                 }
             }
         } catch (Throwable t) {
             // just ignore any potential problems here
         }
-        throw new UnexpectedHttpResponseCodeException(statusCode, message + " - unexpected status code: " + statusCode);
+        if (statusCode==401)
+            throw new AuthExpiredException();
+        if (statusCode>=400&&statusCode<500) {
+            throw new UpdateFailedException("Unexpected response code: " + statusCode, new Exception(), true,
+                                            ApiKey.PermanentFailReason.clientError(statusCode, message));
+        } else
+            throw new UpdateFailedException("Unexpected response code: " + statusCode);
     }
 }

@@ -9,20 +9,20 @@ import java.util.Map;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.fluxtream.Configuration;
-import org.fluxtream.auth.AuthHelper;
-import org.fluxtream.connectors.Connector;
+import org.fluxtream.core.Configuration;
+import org.fluxtream.core.auth.AuthHelper;
+import org.fluxtream.core.connectors.Connector;
 import org.fluxtream.connectors.controllers.ControllerSupport;
-import org.fluxtream.connectors.updaters.UpdateFailedException;
-import org.fluxtream.domain.ApiKey;
-import org.fluxtream.domain.Guest;
-import org.fluxtream.domain.Notification;
-import org.fluxtream.domain.metadata.FoursquareVenue;
-import org.fluxtream.services.GuestService;
-import org.fluxtream.services.JPADaoService;
-import org.fluxtream.services.MetadataService;
-import org.fluxtream.services.NotificationsService;
-import org.fluxtream.utils.HttpUtils;
+import org.fluxtream.core.connectors.updaters.UpdateFailedException;
+import org.fluxtream.core.domain.ApiKey;
+import org.fluxtream.core.domain.Guest;
+import org.fluxtream.core.domain.Notification;
+import org.fluxtream.core.domain.metadata.FoursquareVenue;
+import org.fluxtream.core.services.GuestService;
+import org.fluxtream.core.services.JPADaoService;
+import org.fluxtream.core.services.MetadataService;
+import org.fluxtream.core.services.NotificationsService;
+import org.fluxtream.core.utils.HttpUtils;
 import net.sf.json.JSONObject;
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.Logger;
@@ -171,7 +171,7 @@ public class MovesController {
                                         "refreshToken", refresh_token);
 
         // Record that this connector is now up
-        guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_UP, null);
+        guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_UP, null, null);
 
         if (stateParameter !=null&&!StringUtils.isEmpty(stateParameter))
             return "redirect:/app/tokenRenewed/moves";
@@ -210,8 +210,8 @@ public class MovesController {
 
             // Record permanent failure since this connector won't work again until
             // it is reauthenticated
-            guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_PERMANENT_FAILURE, null);
-            throw new UpdateFailedException("requires token reauthorization",true);
+            guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_PERMANENT_FAILURE, null, ApiKey.PermanentFailReason.NEEDS_REAUTH);
+            throw new UpdateFailedException("requires token reauthorization", true, ApiKey.PermanentFailReason.NEEDS_REAUTH);
         }
 
         // We're not on a mirrored test server.  Try to swap the expired
@@ -230,7 +230,7 @@ public class MovesController {
         try {
             fetched = HttpUtils.fetch(swapTokenUrl, params);
             // Record that this connector is now up
-            guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_UP, null);
+            guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_UP, null, null);
         } catch (Exception e) {
             // Notify the user that the tokens need to be manually renewed
             notificationsService.addNamedNotification(apiKey.getGuestId(), Notification.Type.WARNING, connector.statusNotificationName(),
@@ -241,8 +241,8 @@ public class MovesController {
 
             // Record permanent update failure since this connector is never
             // going to succeed
-            guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_PERMANENT_FAILURE, null);
-            throw new UpdateFailedException("refresh token attempt failed", e, true);
+            guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_PERMANENT_FAILURE, null, ApiKey.PermanentFailReason.NEEDS_REAUTH);
+            throw new UpdateFailedException("refresh token attempt failed", e, true, ApiKey.PermanentFailReason.NEEDS_REAUTH);
         }
 
         JSONObject token = JSONObject.fromObject(fetched);

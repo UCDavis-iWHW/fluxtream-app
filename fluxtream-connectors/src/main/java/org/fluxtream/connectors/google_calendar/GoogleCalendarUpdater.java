@@ -4,23 +4,23 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import org.fluxtream.aspects.FlxLogger;
-import org.fluxtream.connectors.annotations.Updater;
-import org.fluxtream.connectors.updaters.AbstractUpdater;
-import org.fluxtream.connectors.updaters.SettingsAwareUpdater;
-import org.fluxtream.connectors.updaters.SharedConnectorSettingsAwareUpdater;
-import org.fluxtream.connectors.updaters.UpdateFailedException;
-import org.fluxtream.connectors.updaters.UpdateInfo;
-import org.fluxtream.domain.ApiKey;
-import org.fluxtream.domain.ChannelMapping;
-import org.fluxtream.domain.Notification;
-import org.fluxtream.domain.SharedConnector;
-import org.fluxtream.services.ApiDataService;
-import org.fluxtream.services.CoachingService;
-import org.fluxtream.services.JPADaoService;
-import org.fluxtream.services.SettingsService;
-import org.fluxtream.services.impl.BodyTrackHelper;
-import org.fluxtream.utils.Utils;
+import org.fluxtream.core.aspects.FlxLogger;
+import org.fluxtream.core.connectors.annotations.Updater;
+import org.fluxtream.core.connectors.updaters.AbstractUpdater;
+import org.fluxtream.core.connectors.updaters.SettingsAwareUpdater;
+import org.fluxtream.core.connectors.updaters.SharedConnectorSettingsAwareUpdater;
+import org.fluxtream.core.connectors.updaters.UpdateFailedException;
+import org.fluxtream.core.connectors.updaters.UpdateInfo;
+import org.fluxtream.core.domain.ApiKey;
+import org.fluxtream.core.domain.ChannelMapping;
+import org.fluxtream.core.domain.Notification;
+import org.fluxtream.core.domain.SharedConnector;
+import org.fluxtream.core.services.ApiDataService;
+import org.fluxtream.core.services.BuddiesService;
+import org.fluxtream.core.services.JPADaoService;
+import org.fluxtream.core.services.SettingsService;
+import org.fluxtream.core.services.impl.BodyTrackHelper;
+import org.fluxtream.core.utils.Utils;
 import com.google.api.client.auth.oauth2.TokenResponseException;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.http.HttpTransport;
@@ -39,7 +39,7 @@ import org.joda.time.DateTimeConstants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import static org.fluxtream.utils.Utils.hash;
+import static org.fluxtream.core.utils.Utils.hash;
 
 @Component
 @Updater(prettyName = "Calendar", value = 0, objectTypes={GoogleCalendarEventFacet.class},
@@ -62,7 +62,7 @@ public class GoogleCalendarUpdater extends AbstractUpdater implements SettingsAw
     BodyTrackHelper bodyTrackHelper;
 
     @Autowired
-    CoachingService coachingService;
+    BuddiesService buddiesService;
 
     @Override
     protected void updateConnectorDataHistory(UpdateInfo updateInfo) throws Exception, UpdateFailedException {
@@ -86,7 +86,7 @@ public class GoogleCalendarUpdater extends AbstractUpdater implements SettingsAw
                                                   "oauth 2 with Google APIs. Please head to <a href=\"javascript:App.manageConnectors()\">Manage Connectors</a>,<br>" +
                                                   "scroll to the Google Calendar connector, and renew your tokens (look for the <i class=\"icon-resize-small icon-large\"></i> icon)");
         // Report this connector as having failed permanently
-        throw new UpdateFailedException("requires token reauthorization", true);
+        throw new UpdateFailedException("requires token reauthorization", true, ApiKey.PermanentFailReason.NEEDS_REAUTH);
     }
 
     @Override
@@ -465,14 +465,14 @@ public class GoogleCalendarUpdater extends AbstractUpdater implements SettingsAw
 
             // Record permanent update failure since this connector is never
             // going to succeed
-            guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_PERMANENT_FAILURE, Utils.stackTrace(e));
-            throw new UpdateFailedException("refresh token attempt permanently failed due to a bad token refresh response", e, true);
+            guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_PERMANENT_FAILURE, Utils.stackTrace(e), ApiKey.PermanentFailReason.NEEDS_REAUTH);
+            throw new UpdateFailedException("refresh token attempt permanently failed due to a bad token refresh response", e, true, ApiKey.PermanentFailReason.NEEDS_REAUTH);
         }
         catch (IOException e) {
             logger.warn("module=GoogleCalendarUpdater component=background_updates action=refreshToken" +
-                        " connector=" + apiKey.getConnector().getName() + " guestId=" + apiKey.getGuestId() + " status=temporarily failed");
+                        " connector=" + apiKey.getConnector().getName() + " guestId=" + apiKey.getGuestId() + " status=permanently failed");
             // Notify the user that the tokens need to be manually renewed
-            throw new UpdateFailedException("refresh token attempt failed", e, true);
+            throw new UpdateFailedException("refresh token attempt failed", e, true, ApiKey.PermanentFailReason.NEEDS_REAUTH);
         }
         final Calendar.Builder calendarBuilder = new Calendar.Builder(httpTransport, jsonFactory, credential);
         final Calendar calendar = calendarBuilder.build();
@@ -527,6 +527,6 @@ public class GoogleCalendarUpdater extends AbstractUpdater implements SettingsAw
         }
         jsonSettings.put("calendars", sharingSettingsCalendars);
         String toPersist = jsonSettings.toString();
-        coachingService.setSharedConnectorFilter(sharedConnector.getId(), toPersist);
+        buddiesService.setSharedConnectorFilter(sharedConnector.getId(), toPersist);
     }
 }

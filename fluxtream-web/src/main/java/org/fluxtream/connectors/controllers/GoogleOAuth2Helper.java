@@ -1,21 +1,22 @@
 package org.fluxtream.connectors.controllers;
 
+import net.sf.json.JSONObject;
+import org.fluxtream.core.Configuration;
+import org.fluxtream.core.aspects.FlxLogger;
+import org.fluxtream.core.connectors.updaters.UpdateFailedException;
+import org.fluxtream.core.domain.ApiKey;
+import org.fluxtream.core.domain.Notification;
+import org.fluxtream.core.services.GuestService;
+import org.fluxtream.core.services.NotificationsService;
+import org.fluxtream.core.utils.HttpUtils;
+import org.fluxtream.core.utils.UnexpectedHttpResponseCodeException;
+import org.fluxtream.core.utils.Utils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import org.fluxtream.Configuration;
-import org.fluxtream.aspects.FlxLogger;
-import org.fluxtream.connectors.updaters.UpdateFailedException;
-import org.fluxtream.domain.ApiKey;
-import org.fluxtream.domain.Notification;
-import org.fluxtream.services.GuestService;
-import org.fluxtream.services.NotificationsService;
-import org.fluxtream.utils.HttpUtils;
-import org.fluxtream.utils.UnexpectedHttpResponseCodeException;
-import org.fluxtream.utils.Utils;
-import net.sf.json.JSONObject;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 
 /**
  *
@@ -63,8 +64,8 @@ public class GoogleOAuth2Helper {
 
             // Record permanent failure since this connector won't work again until
             // it is reauthenticated
-            guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_PERMANENT_FAILURE, null);
-            throw new UpdateFailedException("requires token reauthorization",true);
+            guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_PERMANENT_FAILURE, null, ApiKey.PermanentFailReason.NEEDS_REAUTH);
+            throw new UpdateFailedException("requires token reauthorization", true, ApiKey.PermanentFailReason.NEEDS_REAUTH);
         }
 
         // We're not on a mirrored test server.  Try to swap the expired
@@ -87,7 +88,7 @@ public class GoogleOAuth2Helper {
                         + " guestId=" + apiKey.getGuestId()
                         + " status=success");
             // Record that this connector is now up
-            guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_UP, null);
+            guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_UP, null, null);
         } catch (IOException e) {
             logger.warn("component=background_updates action=refreshToken" +
                         " connector=" + apiKey.getConnector().getName() + " guestId=" + apiKey.getGuestId() + " status=failed");
@@ -99,8 +100,8 @@ public class GoogleOAuth2Helper {
 
             // Record permanent update failure since this connector is never
             // going to succeed
-            guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_PERMANENT_FAILURE, Utils.stackTrace(e));
-            throw new UpdateFailedException("refresh token attempt failed", e, true);
+            guestService.setApiKeyStatus(apiKey.getId(), ApiKey.Status.STATUS_PERMANENT_FAILURE, Utils.stackTrace(e), ApiKey.PermanentFailReason.NEEDS_REAUTH);
+            throw new UpdateFailedException("refresh token attempt failed", e, true, ApiKey.PermanentFailReason.NEEDS_REAUTH);
         }
 
         JSONObject token = JSONObject.fromObject(fetched);

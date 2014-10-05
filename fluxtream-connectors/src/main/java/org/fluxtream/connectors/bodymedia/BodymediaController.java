@@ -5,18 +5,18 @@ import java.net.URLDecoder;
 import java.security.NoSuchAlgorithmException;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
-import org.fluxtream.Configuration;
-import org.fluxtream.auth.AuthHelper;
-import org.fluxtream.connectors.Connector;
+import org.fluxtream.core.Configuration;
+import org.fluxtream.core.auth.AuthHelper;
+import org.fluxtream.core.connectors.Connector;
 import org.fluxtream.connectors.controllers.ControllerSupport;
-import org.fluxtream.connectors.updaters.UpdateFailedException;
-import org.fluxtream.connectors.updaters.UpdateInfo;
-import org.fluxtream.domain.ApiKey;
-import org.fluxtream.domain.Guest;
-import org.fluxtream.domain.Notification;
-import org.fluxtream.services.ConnectorUpdateService;
-import org.fluxtream.services.GuestService;
-import org.fluxtream.services.NotificationsService;
+import org.fluxtream.core.connectors.updaters.UpdateFailedException;
+import org.fluxtream.core.connectors.updaters.UpdateInfo;
+import org.fluxtream.core.domain.ApiKey;
+import org.fluxtream.core.domain.Guest;
+import org.fluxtream.core.domain.Notification;
+import org.fluxtream.core.services.ConnectorUpdateService;
+import org.fluxtream.core.services.GuestService;
+import org.fluxtream.core.services.NotificationsService;
 import oauth.signpost.OAuthConsumer;
 import oauth.signpost.OAuthProvider;
 import oauth.signpost.basic.DefaultOAuthConsumer;
@@ -187,8 +187,8 @@ public class BodymediaController {
 
             // Record permanent failure since this connector won't work again until
             // it is reauthenticated
-            guestService.setApiKeyStatus(updateInfo.apiKey.getId(), ApiKey.Status.STATUS_PERMANENT_FAILURE, null);
-            throw new UpdateFailedException("requires token reauthorization",true);
+            guestService.setApiKeyStatus(updateInfo.apiKey.getId(), ApiKey.Status.STATUS_PERMANENT_FAILURE, null, ApiKey.PermanentFailReason.NEEDS_REAUTH);
+            throw new UpdateFailedException("requires token reauthorization",true, ApiKey.PermanentFailReason.NEEDS_REAUTH);
         }
 
         // We're not on a mirrored test server.  Try to swap the expired
@@ -231,7 +231,7 @@ public class BodymediaController {
                                             "tokenExpiration", provider.getResponseParameters().get("xoauth_token_expiration_time").first());
 
             // Record this connector as having status up
-            guestService.setApiKeyStatus(updateInfo.apiKey.getId(), ApiKey.Status.STATUS_UP, null);
+            guestService.setApiKeyStatus(updateInfo.apiKey.getId(), ApiKey.Status.STATUS_UP, null, null);
             // Schedule an update for this connector
             connectorUpdateService.updateConnector(updateInfo.apiKey, false);
 
@@ -243,8 +243,8 @@ public class BodymediaController {
                                                       "scroll to the BodyMedia connector, and renew your tokens (look for the <i class=\"icon-resize-small icon-large\"></i> icon)");
             // Record permanent failure since this connector won't work again until
             // it is reauthenticated
-            guestService.setApiKeyStatus(updateInfo.apiKey.getId(), ApiKey.Status.STATUS_PERMANENT_FAILURE, null);
-            throw new UpdateFailedException("refresh token attempt failed", t, true);
+            guestService.setApiKeyStatus(updateInfo.apiKey.getId(), ApiKey.Status.STATUS_PERMANENT_FAILURE, null, ApiKey.PermanentFailReason.NEEDS_REAUTH);
+            throw new UpdateFailedException("refresh token attempt failed", t, true, ApiKey.PermanentFailReason.NEEDS_REAUTH);
         }
     }
 }
