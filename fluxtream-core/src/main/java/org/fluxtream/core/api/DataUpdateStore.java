@@ -9,7 +9,7 @@ import org.fluxtream.core.domain.CoachingBuddy;
 import org.fluxtream.core.domain.DataUpdate;
 import org.fluxtream.core.domain.Guest;
 import org.fluxtream.core.mvc.models.DataUpdateDigestModel;
-import org.fluxtream.core.services.CoachingService;
+import org.fluxtream.core.services.BuddiesService;
 import org.fluxtream.core.services.DataUpdateService;
 import org.fluxtream.core.services.GuestService;
 import org.fluxtream.core.services.SettingsService;
@@ -40,16 +40,16 @@ public class DataUpdateStore {
     DataUpdateService dataUpdateService;
 
     @Autowired
-    CoachingService coachingService;
+    BuddiesService buddiesService;
 
     @GET
     @Path("/all")
     @Produces({MediaType.APPLICATION_JSON})
     public Response getDataUpdates(@QueryParam("since") String since,
-                                   @ApiParam(value="Buddy to access username Header (" + CoachingService.BUDDY_TO_ACCESS_HEADER + ")", required=false) @HeaderParam(CoachingService.BUDDY_TO_ACCESS_HEADER) String coacheeUsernameHeader){
+                                   @ApiParam(value="Buddy to access username parameter (" + BuddiesService.BUDDY_TO_ACCESS_PARAM + ")", required=false) @QueryParam(BuddiesService.BUDDY_TO_ACCESS_PARAM) String buddyToAccessParameter){
         try{
             CoachingBuddy coachee;
-            try { coachee = AuthHelper.getCoachee(coacheeUsernameHeader, coachingService);
+            try { coachee = AuthHelper.getCoachee(buddyToAccessParameter, buddiesService);
             } catch (CoachRevokedException e) {return Response.status(403).entity("Sorry, permission to access this data has been revoked. Please reload your browser window").build();}
             Guest guest = ApiHelper.getBuddyToAccess(guestService, coachee);
             if (guest==null)
@@ -59,6 +59,7 @@ public class DataUpdateStore {
             return Response.ok(gson.toJson(new DataUpdateDigestModel(updates,guestService,settingsService,ISODateTimeFormat.dateTime().parseMillis(since)))).build();
         }
         catch (Exception e){
+            e.printStackTrace();
             return Response.serverError().entity("Failed to fetch updates").build();
         }
     }

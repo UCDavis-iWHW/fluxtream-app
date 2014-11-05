@@ -155,6 +155,7 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
 
     Calendar.renderDefaultState = function() {
         Calendar.navigateState("clock/date/"+moment().format("YYYY-MM-DD"));
+//        Calendar.navigateState("timeline/week/"+moment().year()+"/"+moment().week());
     };
 
     function updateTimeRange(digest, state) {
@@ -233,6 +234,9 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
             }
 
         }
+
+        App.state.saveState("calendar", Calendar.toStateURL(state));
+
         // Next time the page loads, won't accidentally believe that the timespan in the
         // title and calendar bar has already been initialized
         //Calendar.timespanInited = false;
@@ -271,9 +275,10 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
         var thisFetchId = ++fetchId;
         if (lastFetch != null)
             lastFetch.abort();
+        var url = "/api/v1/calendar/all/" + state.tabState;
+        if (App.buddyToAccess["isBuddy"]) url += "?"+App.BUDDY_TO_ACCESS_PARAM+"="+App.buddyToAccess["id"];
         lastFetch = $.ajax({
-            url: "/api/v1/calendar/all/" + state.tabState,
-            beforeSend: function(xhr){if(!_.isUndefined(App.viewee)){xhr.setRequestHeader(App.COACHEE_BUDDY_TO_ACCESS_HEADER, App.viewee);}},
+            url: url,
 			success : function(response) {
                 if (thisFetchId != fetchId)//we litter the callback with these in case a we got to the callback but a new request started
                     return;
@@ -327,7 +332,7 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
                 case "eventStart":
                     var eventStart = moment(facet[member], "YYYYMMDD'T'HHmmss.SSSZ");
                     facet.startMinute = eventStart.hour()*60+eventStart.minute();
-                    facet.startTime = {"hours" : eventStart.hour()>12?eventStart.hour()-12:eventStart.hour(), "minutes" : pad(eventStart.minute()), "ampm" : eventStart.hour()>12?"pm":"am"};
+                    facet.startTime = {"hours" : eventStart.hour()==0 ? 12:eventStart.hour()>12?eventStart.hour()-12:eventStart.hour(), "minutes" : pad(eventStart.minute()), "ampm" : eventStart.hour()>=12?"pm":"am"};
                     facet.time = App.formatMinuteOfDay(facet.startMinute)[0];
                     facet.ampm = App.formatMinuteOfDay(facet.startMinute)[1];
                     facet.start = eventStart.utc().valueOf();
@@ -336,7 +341,7 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
                 case "eventEnd":
                     var eventEnd = moment(facet[member], "YYYYMMDD'T'HHmmss.SSSZ");
                     facet.endMinute = eventEnd.hour()*60+eventEnd.minute();
-                    facet.endTime = {"hours" : eventEnd.hour()>12?eventEnd.hour()-12:eventEnd.hour(), "minutes" : pad(eventEnd.minute()), "ampm" : eventEnd.hour()>12?"pm":"am"};
+                    facet.endTime = {"hours" : eventEnd.hour()==0 ? 12:eventEnd.hour()>12?eventEnd.hour()-12:eventEnd.hour(), "minutes" : pad(eventEnd.minute()), "ampm" : eventEnd.hour()>=12?"pm":"am"};
                     facet.end = eventEnd.utc().valueOf();
                     break;
             }
@@ -705,7 +710,7 @@ define(["core/Application", "core/FlxState", "applications/calendar/Builder", "l
             var configFilterLabel = connectorConfig.filterLabel,
                 filterLabel = configFilterLabel || connector.prettyName;
 
-            filterLabel = filterLabel.replace("_", " ");
+            filterLabel = filterLabel.replace(/_/g, " ");
 
             buttonLink
                 .toggleClass("flx-disconnected", !connected)

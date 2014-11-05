@@ -373,7 +373,40 @@ define(["core/grapher/BTCore"],function(BTCore){
                         $("#photoDialog #_timeline_photo_dialog_comment").select().focus();
                     });
 
-                    // configure the Save button
+                    // only show the Delete button for FluxtreamCapture photos
+                    if (deviceName=="FluxtreamCapture")
+                        $("#photoDialog #_timeline_photo_dialog_delete_button").show();
+
+                    // configure the Delete button
+                    $("#photoDialog #_timeline_photo_dialog_delete_button").click(function() {
+                        // set form buttons to disabled while saving
+                        //$("#_timeline_photo_dialog_save_button").attr("disabled", "disabled");
+                        $("#photoDialog #_timeline_photo_dialog_revert_button").attr("disabled", "disabled");
+
+                        $("#photoDialog #_timeline_photo_dialog_form").hide();
+                        $("#photoDialog #_timeline_photo_dialog_form_status").text("Deleting...").show();
+
+                        var compoundPhotoIdComponents = compoundPhotoId.split(".");
+
+                        $.ajax({
+                            cache    : false,
+                            type     : "DELETE",
+                            url      : "/api/v1/bodytrack/photo/" + App.buddyToAccess.id + "/" + compoundPhotoIdComponents[2],
+                            success  : function(savedData, textStatus, jqXHR) {
+                                // just hide the photo dialog for now
+                                // TODO: leverage the "after saving(/deleting), go to the next/previous photo" option
+                                $("#photoModal").modal("hide");
+                                App.activeApp.renderState(App.state.getState(App.activeApp.name),true);//force refresh of the current app state
+                            },
+                            error    : function(jqXHR, textStatus, errorThrown) {
+                                console.log("Failed to delete photo [" + compoundPhotoId + "]:  textStatus=[" + textStatus + "] errorThrown=[" + errorThrown + "]");
+                                $("#photoDialog #_timeline_photo_dialog_form_status").text("Delete failed.").show();
+                            }
+                        });
+
+                    });
+
+                        // configure the Save button
                     $("#photoDialog #_timeline_photo_dialog_save_button").click(function() {
 
                         // set form buttons to disabled while saving
@@ -399,8 +432,8 @@ define(["core/grapher/BTCore"],function(BTCore){
                                     //console.log("Successfully saved comment and tags for photo [" + compoundPhotoId + "]");
                                     //console.log(savedData);
                                     photoCache.update(compoundPhotoId, {
-                                        "comment": savedData['payload']['comment'],
-                                        "tags": savedData['payload']['tags']
+                                        "comment": savedData['comment'],
+                                        "tags": savedData['tags']
                                     });
                                     TAG_MANAGER.refreshTagCache(function() {
 
@@ -419,7 +452,7 @@ define(["core/grapher/BTCore"],function(BTCore){
                                                     $("#photoDialog #_timeline_photo_dialog_next_button").click();
                                                 } else {
                                                     // recreate the comment and tag form
-                                                    createCommentAndTagForm(savedData['payload']['comment'], savedData['payload']['tags']);
+                                                    createCommentAndTagForm(savedData['comment'], savedData['tags']);
 
                                                     $("#_timeline_photo_dialog_form").show();
 
@@ -516,7 +549,7 @@ define(["core/grapher/BTCore"],function(BTCore){
 
                     // set focus on the comment input, and select all the text
                     $("#photoDialog #_timeline_photo_dialog_comment").select().focus();
-
+                    $(".ui-autocomplete").css("z-index", "10000");
                 };
 
                 // create the comment and tag form, hide the status area, and show the form

@@ -15,7 +15,7 @@ import org.fluxtream.core.domain.AbstractFacet;
 import org.fluxtream.core.domain.ApiKey;
 import org.fluxtream.core.domain.GuestSettings;
 import org.fluxtream.core.mvc.models.TimespanModel;
-import org.fluxtream.core.services.CoachingService;
+import org.fluxtream.core.services.BuddiesService;
 import org.fluxtream.core.services.SettingsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -32,7 +32,7 @@ public class EvernoteBodytrackResponder extends AbstractBodytrackResponder {
     SettingsService settingsService;
 
     @Autowired
-    CoachingService coachingService;
+    BuddiesService buddiesService;
 
     @Override
     public List<TimespanModel> getTimespans(final long startMillis, final long endMillis,
@@ -41,8 +41,8 @@ public class EvernoteBodytrackResponder extends AbstractBodytrackResponder {
         EvernoteConnectorSettings connectorSettings = (EvernoteConnectorSettings)settingsService.getConnectorSettings(apiKey.getId());
         final TimeInterval timeInterval = new SimpleTimeInterval(startMillis, endMillis, TimeUnit.ARBITRARY, TimeZone.getTimeZone("UTC"));
         String objectTypeName = "Evernote-note";
-        List<AbstractFacet> facets = getFacetsInTimespan(timeInterval, apiKey, ObjectType.getObjectType(Connector.getConnector("evernote"), "note"));
-        facets = coachingService.filterFacets(AuthHelper.getGuestId(), apiKey.getId(), facets);
+        List<AbstractFacet> facets = getFacetsInTimespanOrderedByEnd(timeInterval, apiKey, ObjectType.getObjectType(Connector.getConnector("evernote"), "note"));
+        facets = buddiesService.filterFacets(AuthHelper.getGuestId(), apiKey.getId(), facets);
 
         // The start and end times of track facets are the same.  Assume that the
         // start time is correct and arbitrarily draw a box that's 7 mins or
@@ -55,9 +55,9 @@ public class EvernoteBodytrackResponder extends AbstractBodytrackResponder {
             if (connectorSettings!=null) {
                 final NotebookConfig notebookConfig = connectorSettings.getNotebook(note.notebookGuid);
                 if (notebookConfig!=null&&!notebookConfig.hidden)
-                    items.add(new TimespanModel(note.start, note.start + duration, ((EvernoteNoteFacet)facet).notebookGuid, objectTypeName));
+                    simpleMergeAddTimespan(items,new TimespanModel(note.start, note.start + duration, ((EvernoteNoteFacet)facet).notebookGuid, objectTypeName),startMillis,endMillis);
             } else
-                items.add(new TimespanModel(note.start, note.start + duration, ((EvernoteNoteFacet)facet).notebookGuid, objectTypeName));
+                simpleMergeAddTimespan(items,new TimespanModel(note.start, note.start + duration, ((EvernoteNoteFacet)facet).notebookGuid, objectTypeName),startMillis,endMillis);
         }
         return items;
     }

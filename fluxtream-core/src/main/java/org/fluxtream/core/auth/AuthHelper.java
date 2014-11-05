@@ -1,8 +1,9 @@
 package org.fluxtream.core.auth;
 
+import org.apache.commons.lang.StringUtils;
 import org.fluxtream.core.domain.CoachingBuddy;
 import org.fluxtream.core.domain.Guest;
-import org.fluxtream.core.services.CoachingService;
+import org.fluxtream.core.services.BuddiesService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -21,13 +22,20 @@ public class AuthHelper {
 		return guestId;
 	}
 
-    public static boolean isViewingGranted(String connectorName, CoachingService coachingService) {
+    public static boolean isFullyAuthenticated() {
+        Authentication auth = SecurityContextHolder.getContext()
+                .getAuthentication();
+        return (auth != null && auth.isAuthenticated()
+                && auth.getPrincipal() instanceof FlxUserDetails);
+    }
+
+    public static boolean isViewingGranted(String connectorName, BuddiesService buddiesService) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         final FlxUserDetails principal = (FlxUserDetails) auth.getPrincipal();
         if (principal.coachee==null)
             return true;
         else {
-            return coachingService.isViewingGranted(principal.guestId, principal.coachee.guestId, connectorName);
+            return buddiesService.isViewingGranted(principal.guestId, principal.coachee.guestId, connectorName);
         }
     }
 
@@ -57,6 +65,7 @@ public class AuthHelper {
             return;
         CoachingBuddy toRemove = null;
         for (CoachingBuddy buddy : buddies) {
+            if (buddy==null) continue;
             if (buddy.getId()==coachee.getId()) {
                 toRemove = buddy;
                 break;
@@ -81,11 +90,19 @@ public class AuthHelper {
         }
     }
 
-    public static CoachingBuddy getCoachee(String coacheeUsernameHeader, CoachingService coachingService) throws CoachRevokedException {
-        if (coacheeUsernameHeader!=null&&coacheeUsernameHeader.equals("self"))
+    public static CoachingBuddy getCoachee(String buddyToAccessParameter, BuddiesService buddiesService) throws CoachRevokedException {
+        if (buddyToAccessParameter==null || buddyToAccessParameter!=null&&buddyToAccessParameter.equals("self")) {
             as(null);
-        if (coacheeUsernameHeader !=null&&!coacheeUsernameHeader.equals("self")) {
-            final CoachingBuddy coachee = coachingService.getCoachee(getGuestId(), coacheeUsernameHeader);
+            return null;
+        } else if (buddyToAccessParameter !=null&&!buddyToAccessParameter.equals("self")) {
+            CoachingBuddy coachee;
+            if (StringUtils.isNumeric(buddyToAccessParameter)) {
+                final Long coacheeId = Long.valueOf(buddyToAccessParameter, 10);
+                if (coacheeId==AuthHelper.getGuestId())
+                    return null;
+                coachee = buddiesService.getTrustingBuddy(getGuestId(), coacheeId);
+            } else
+                coachee = buddiesService.getTrustingBuddy(getGuestId(), buddyToAccessParameter);
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             final FlxUserDetails principal = (FlxUserDetails) auth.getPrincipal();
             if (coachee!=null) {
@@ -97,8 +114,7 @@ public class AuthHelper {
                 principal.coachee = null;
                 throw new CoachRevokedException();
             }
-        } else
-            return getCoachee();
+        } else return getCoachee();
     }
 
     public static CoachingBuddy getCoachee() throws CoachRevokedException {

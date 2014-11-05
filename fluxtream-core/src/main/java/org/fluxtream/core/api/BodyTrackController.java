@@ -7,9 +7,7 @@ import com.sun.jersey.core.header.ContentDisposition;
 import com.sun.jersey.multipart.BodyPart;
 import com.sun.jersey.multipart.BodyPartEntity;
 import com.sun.jersey.multipart.MultiPart;
-import com.wordnik.swagger.annotations.Api;
-import com.wordnik.swagger.annotations.ApiOperation;
-import com.wordnik.swagger.annotations.ApiParam;
+import com.wordnik.swagger.annotations.*;
 import org.apache.commons.io.IOUtils;
 import org.fluxtream.core.Configuration;
 import org.fluxtream.core.SimpleTimeInterval;
@@ -20,7 +18,9 @@ import org.fluxtream.core.auth.AuthHelper;
 import org.fluxtream.core.connectors.Connector;
 import org.fluxtream.core.connectors.ObjectType;
 import org.fluxtream.core.connectors.bodytrackResponders.AbstractBodytrackResponder;
+import org.fluxtream.core.connectors.dao.FacetDao;
 import org.fluxtream.core.connectors.fluxtream_capture.FluxtreamCapturePhoto;
+import org.fluxtream.core.connectors.fluxtream_capture.FluxtreamCapturePhotoFacet;
 import org.fluxtream.core.connectors.fluxtream_capture.FluxtreamCapturePhotoStore;
 import org.fluxtream.core.connectors.vos.AbstractPhotoFacetVO;
 import org.fluxtream.core.domain.*;
@@ -72,7 +72,7 @@ public class BodyTrackController {
     BodyTrackHelper bodyTrackHelper;
 
     @Autowired
-    CoachingService coachingService;
+    BuddiesService buddiesService;
 
     @Autowired
     private FluxtreamCapturePhotoStore fluxtreamCapturePhotoStore;
@@ -88,6 +88,9 @@ public class BodyTrackController {
     @Autowired
 	protected ApiDataService apiDataService;
 
+    @Autowired
+    FacetDao facetDao;
+
     @Autowired JsonResponseHelper jsonResponseHelper;
 
     @Autowired
@@ -95,7 +98,10 @@ public class BodyTrackController {
 
     @GET
     @Path("/exportCSV/{UID}/fluxtream-export-from-{start}-to-{end}.csv")
-    @ApiOperation(value = "CSV export <startTime -> endTime", response = String.class)
+    @ApiOperation(value = "CSV export of data from a given time range")
+    @ApiResponses({
+        @ApiResponse(code=200, message="CSV data")
+    })
     public void exportCSV(@ApiParam(value="Channels", required=true) @QueryParam("channels") String channels,
                           @ApiParam(value="Start time (epoch seconds)", required=true) @PathParam("start") Long start,
                           @ApiParam(value="End time (epoch seconds)", required=true) @PathParam("end") Long end,
@@ -103,8 +109,8 @@ public class BodyTrackController {
                           @Context HttpServletResponse response){
         try{
             long loggedInUserId = AuthHelper.getGuestId();
-            boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = coachingService.getCoachee(loggedInUserId, uid);
+            boolean accessAllowed = isOwnerOrAdmin(uid);
+            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
 
             if (!accessAllowed && coachee==null) {
                 uid = null;
@@ -134,7 +140,10 @@ public class BodyTrackController {
 
     @GET
     @Path("/exportCSV/{UID}/fluxtream-export-from-{start}.csv")
-    @ApiOperation(value = "CSV export <startTime", response = String.class)
+    @ApiOperation(value = "CSV export of data from a given start time onwards")
+    @ApiResponses({
+            @ApiResponse(code=200, message="CSV data")
+    })
     public void exportCSVStartOnly(@ApiParam(value="Channels", required=true) @QueryParam("channels") String channels,
                                    @ApiParam(value="Start time (epoch seconds)", required=true) @PathParam("start") Long start,
                                    @ApiParam(value="User ID (must be ID of loggedIn user)", required=true) @PathParam("UID") Long uid,
@@ -144,7 +153,10 @@ public class BodyTrackController {
 
     @GET
     @Path("/exportCSV/{UID}/fluxtream-export-to-{end}.csv")
-    @ApiOperation(value = "CSV export <startTime", response = String.class)
+    @ApiOperation(value = "CSV export of data from a given end time and all before")
+    @ApiResponses({
+            @ApiResponse(code=200, message="CSV data")
+    })
     public void exportCSVEndOnly(@ApiParam(value="Channels", required=true) @QueryParam("channels") String channels,
                                  @ApiParam(value="End time (epoch seconds)", required=true) @PathParam("end") Long end,
                                  @ApiParam(value="User ID (must be ID of loggedIn user)", required=true) @PathParam("UID") Long uid,
@@ -154,7 +166,10 @@ public class BodyTrackController {
 
     @GET
     @Path("/exportCSV/{UID}/fluxtream-export.csv")
-    @ApiOperation(value = "CSV export all data for given user id", response = String.class)
+    @ApiOperation(value = "CSV export all data for given user id")
+    @ApiResponses({
+            @ApiResponse(code=200, message="CSV data")
+    })
     public void exportCSVNoParams(@ApiParam(value="Channels", required=true) @QueryParam("channels") String channels,
                                   @ApiParam(value="User ID (must be ID of loggedIn user)", required=true) @PathParam("UID") Long uid,
                                   @Context HttpServletResponse response){
@@ -165,7 +180,7 @@ public class BodyTrackController {
     @POST
 	@Path("/uploadHistory")
     @Secured("ROLE_ADMIN")
-	@Produces({ MediaType.APPLICATION_JSON })
+	@Produces("text/plain")
 	public Response loadHistory(@QueryParam("username") String username,
 			@QueryParam("connectorName") String connectorName) throws InstantiationException,
 			IllegalAccessException, ClassNotFoundException {
@@ -173,7 +188,7 @@ public class BodyTrackController {
         try{
             Guest guest = guestService.getGuest(username);
 
-            if (!checkForPermissionAccess(guest.getId())){
+            if (!isOwnerOrAdmin(guest.getId())){
                 response = Response.ok("Failure!").build();
             }
             else {
@@ -190,13 +205,16 @@ public class BodyTrackController {
 
     @DELETE
     @Path("/users/{UID}/views/{id}")
-    @ApiOperation(value = "Delete a view", response = String.class)
-    @Produces({ MediaType.APPLICATION_JSON })
+    @ApiOperation(value = "Delete a view")
+    @Produces("text/plain")
+    @ApiResponses({
+            @ApiResponse(code=200, message="Successfully deleted view {viewId}")
+    })
     public Response deleteBodytrackView(@ApiParam(value="User ID (must be ID of loggedIn user)", required=true) @PathParam("UID") Long uid,
                                       @ApiParam(value="View ID", required=true) @PathParam("id") long viewId){
         Response response;
         try{
-            if (!checkForPermissionAccess(uid)){
+            if (!isOwnerOrAdmin(uid)){
                 uid = null;
             }
             bodyTrackHelper.deleteView(uid, viewId);
@@ -210,10 +228,12 @@ public class BodyTrackController {
 
     @POST
     @Path("/upload")
+    @ApiOperation(value = "Upload binary data via multipart encoding for the current logged in user", response = BodyTrackUploadResponse.class)
     @Consumes({MediaType.MULTIPART_FORM_DATA,MediaType.APPLICATION_FORM_URLENCODED})
     @Produces({MediaType.APPLICATION_JSON})
-    public Response uploadToBodytrack(@FormParam("dev_nickname") String deviceNickname, @FormParam("channel_names") String channels,
-                                    @FormParam("data") String data){
+    public Response uploadToBodytrack(@ApiParam(value="The device to upload the data for", required=true) @FormParam("dev_nickname") String deviceNickname,
+                                      @ApiParam(value="JSON encoded array of channels being uploaded for", required=true) @FormParam("channel_names") String channels,
+                                      @ApiParam(value="Multipart form data to be uploaded", required=true)  @FormParam("data") String data){
         Response response;
         try{
             long guestId = AuthHelper.getGuestId();
@@ -229,15 +249,20 @@ public class BodyTrackController {
                 List<Object> currentList = new ArrayList<Object>();
                 parsedData.add(currentList);
                 for (JsonElement dataPoint : e.getAsJsonArray()){
-                    JsonPrimitive primitive = dataPoint.getAsJsonPrimitive();
-                    if (primitive.isBoolean()){
-                        currentList.add(primitive.getAsBoolean());
-                    }
-                    else if (primitive.isString()){
-                        currentList.add(primitive.getAsString());
+                    if (dataPoint instanceof JsonNull){
+                        currentList.add(null);
                     }
                     else{
-                        currentList.add(primitive.getAsDouble());
+                        JsonPrimitive primitive = dataPoint.getAsJsonPrimitive();
+                        if (primitive.isBoolean()){
+                            currentList.add(primitive.getAsBoolean());
+                        }
+                        else if (primitive.isString()){
+                            currentList.add(primitive.getAsString());
+                        }
+                        else{
+                            currentList.add(primitive.getAsDouble());
+                        }
                     }
                 }
             }
@@ -262,8 +287,10 @@ public class BodyTrackController {
 
     @POST
     @Path("/jupload")
+    @ApiOperation(value = "Upload JSON data for current logged in user", response = BodyTrackUploadResponse.class)
     @Produces({MediaType.APPLICATION_JSON})
-    public Response uploadJsonToBodytrack(@QueryParam("dev_nickname")  String deviceNickname, String body){
+    public Response uploadJsonToBodytrack(@ApiParam(value="The device to upload the data for", required=true) @QueryParam("dev_nickname")  String deviceNickname,
+                                          @ApiParam(value="The data to upload", required=true) String body){
         Response response;
         try{
             long uid = AuthHelper.getGuestId();
@@ -305,9 +332,11 @@ public class BodyTrackController {
     // Based on code from http://aruld.info/handling-multiparts-in-restful-applications-using-jersey/ and http://stackoverflow.com/a/4687942
     @POST
     @Path("/photoUpload")
+    @ApiOperation(value = "Upload a photo for the current logged in user", response = PhotoUploadResponsePayload.class)
     @Consumes({MediaType.MULTIPART_FORM_DATA})
     @Produces({MediaType.APPLICATION_JSON})
-    public Response handlePhotoUpload(@QueryParam("connector_name") final String connectorName, final MultiPart multiPart) {
+    public Response handlePhotoUpload(@ApiParam(value="Connector to upload the photo for", required=true) @QueryParam("connector_name") final String connectorName,
+                                      final MultiPart multiPart) {
         Response response;
 
         final Connector connector = Connector.getConnector(connectorName);
@@ -419,8 +448,13 @@ public class BodyTrackController {
 
     @GET
     @Path("/photo/{UID}.{PhotoStoreKeySuffix}")
-    public Response getFluxtreamCapturePhoto(@PathParam("UID") final Long uid,
-                                             @PathParam("PhotoStoreKeySuffix") final String photoStoreKeySuffix,
+    @ApiResponses({
+            @ApiResponse(code=200, message="Photo Image data (png/jpg)"),
+            @ApiResponse(code=403, message="In case of unauthorized access")
+    })
+    @ApiOperation(value="Retrieve a specific photo by photo store key suffix")
+    public Response getFluxtreamCapturePhoto(@ApiParam(value="User ID", required=true) @PathParam("UID") final Long uid,
+                                             @ApiParam(value="Photo Store Key Suffix", required=true) @PathParam("PhotoStoreKeySuffix") final String photoStoreKeySuffix,
                                              @Context final Request request) {
 
         return getFluxtreamCapturePhoto(uid, request, new FluxtreamCapturePhotoFetchStrategy() {
@@ -442,9 +476,14 @@ public class BodyTrackController {
 
     @GET
     @Path("/photoThumbnail/{UID}/{PhotoId}/{ThumbnailIndex}")
-    public Response getFluxtreamCapturePhotoThumbnail(@PathParam("UID") final long uid,
-                                                      @PathParam("PhotoId") final long photoId,
-                                                      @PathParam("ThumbnailIndex") final int thumbnailIndex,
+    @ApiResponses({
+            @ApiResponse(code=200, message="Photo Image data (png/jpg)"),
+            @ApiResponse(code=403, message="In case of unauthorized access")
+    })
+    @ApiOperation(value="Retrieve a specific photo thumbnail")
+    public Response getFluxtreamCapturePhotoThumbnail(@ApiParam(value="User ID", required=true) @PathParam("UID") final long uid,
+                                                      @ApiParam(value="Photo ID", required=true) @PathParam("PhotoId") final long photoId,
+                                                      @ApiParam(value="Thumbnail ID", required=true) @PathParam("ThumbnailIndex") final int thumbnailIndex,
                                                       @Context final Request request) {
 
         return getFluxtreamCapturePhoto(uid, request, new FluxtreamCapturePhotoFetchStrategy() {
@@ -473,9 +512,9 @@ public class BodyTrackController {
         Long loggedInUserId = null;
         try {
             loggedInUserId = AuthHelper.getGuestId();
-            accessAllowed = checkForPermissionAccess(uid);
+            accessAllowed = isOwnerOrAdmin(uid);
             if (!accessAllowed) {
-                final CoachingBuddy coachee = coachingService.getCoachee(loggedInUserId, uid);
+                final CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
                 if (coachee != null) {
                     accessAllowed = coachee.hasAccessToConnector("fluxtream_capture");
                 }
@@ -547,30 +586,57 @@ public class BodyTrackController {
 
     @GET
     @Path("/tiles/{UID}/{DeviceNickname}.{ChannelName}/{Level}.{Offset}.json")
+    @ApiOperation(value="Get data tile for a given channel", response=BodyTrackHelper.GetTileResponse.class)
+    @ApiResponses({
+            @ApiResponse(code=403, message="In case of unauthorized access")
+    })
     @Produces({MediaType.APPLICATION_JSON})
-    public Response fetchTile(@PathParam("UID") Long uid, @PathParam("DeviceNickname") String deviceNickname,
-                                   @PathParam("ChannelName") String channelName, @PathParam("Level") int level, @PathParam("Offset") long offset){
+    public Response fetchTile(@ApiParam(value="User ID", required=true) @PathParam("UID") Long uid,
+                              @ApiParam(value="Device Name", required=true) @PathParam("DeviceNickname") String deviceNickname,
+                              @ApiParam(value="Channel Name", required=true) @PathParam("ChannelName") String channelName,
+                              @ApiParam(value="Level of tile", required=true) @PathParam("Level") int level,
+                              @ApiParam(value="Offset of tile", required=true) @PathParam("Offset") long offset){
         try{
             long loggedInUserId = AuthHelper.getGuestId();
-            boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = coachingService.getCoachee(loggedInUserId, uid);
+            boolean accessAllowed = isOwnerOrAdmin(uid);
+            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
             if (!accessAllowed&&coachee==null){
                 uid = null;
             }
+//            if (coachee!=null) {
+//                ApiKey apiKey = getApiKeyFromDeviceNickname(deviceNickname, coachee.guestId);
+//                if (apiKey==null)
+//                    return Response.status(Response.Status.BAD_REQUEST).entity("Couldn't find connector with device nickname=" + deviceNickname).build();
+//                else if (buddiesService.getSharedConnector(apiKey.getId(), AuthHelper.getGuestId())==null)
+//                    return Response.status(Response.Status.UNAUTHORIZED).entity("Access denied to device " + deviceNickname).build();
+//            }
             return Response.ok(bodyTrackHelper.fetchTile(uid, deviceNickname, channelName, level, offset)).build();
-        } catch (Exception e){
+        } catch (Exception e) {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Access Denied").build();
         }
     }
 
+    private ApiKey getApiKeyFromDeviceNickname(String deviceNickname, long guestId) {
+        final List<ApiKey> apiKeys = guestService.getApiKeys(guestId, Connector.fromDeviceNickname(deviceNickname));
+        // bodytrack doesn't have the ability to handle multiple instances of the same connector yet, so returning
+        // the first matching ApiKey
+        if (apiKeys.size()>0)
+            return apiKeys.get(0);
+        return null;
+    }
+
     @GET
     @Path("/users/{UID}/views")
+    @ApiOperation(value="Get a list of available views", response=BodyTrackHelper.ViewsList.class)
     @Produces({MediaType.APPLICATION_JSON})
-    public Response getViews(@PathParam("UID") Long uid) {
+    @ApiResponses({
+            @ApiResponse(code=403, message="In case of unauthorized access")
+    })
+    public Response getViews(@ApiParam(value="User ID", required=true) @PathParam("UID") Long uid) {
         try{
             long loggedInUserId = AuthHelper.getGuestId();
-            boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = coachingService.getCoachee(loggedInUserId, uid);
+            boolean accessAllowed = isOwnerOrAdmin(uid);
+            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
             if (!accessAllowed&&coachee==null){
                 uid = null;
             }
@@ -583,12 +649,17 @@ public class BodyTrackController {
 
     @GET
     @Path("/users/{UID}/views/{id}")
+    @ApiOperation(value="Retrieve a specific view", response=BodyTrackHelper.ViewJSON.class)
+    @ApiResponses({
+            @ApiResponse(code=403, message="In case of unauthorized access")
+    })
     @Produces({MediaType.APPLICATION_JSON})
-    public Response bodyTrackView(@PathParam("UID") Long uid, @PathParam("id") long id) {
+    public Response bodyTrackView(@ApiParam(value="User ID", required=true) @PathParam("UID") Long uid,
+                                  @ApiParam(value="View ID", required= true) @PathParam("id") long id) {
         try{
             long loggedInUserId = AuthHelper.getGuestId();
-            boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = coachingService.getCoachee(loggedInUserId, uid);
+            boolean accessAllowed = isOwnerOrAdmin(uid);
+            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
 
             if (!accessAllowed && coachee==null) {
                 uid = null;
@@ -606,12 +677,18 @@ public class BodyTrackController {
 
     @POST
     @Path("/users/{UID}/views")
+    @ApiOperation(value="Create a new view with given name and data", response = BodyTrackHelper.AddViewResult.class)
+    @ApiResponses({
+            @ApiResponse(code=403, message="In case of unauthorized access")
+    })
     @Produces({MediaType.APPLICATION_JSON})
-    public Response setView(@PathParam("UID") Long uid, @FormParam("name") String name, @FormParam("data") String data) {
+    public Response setView(@ApiParam(value="User ID", required = true) @PathParam("UID") Long uid,
+                            @ApiParam(value="View name", required = true) @FormParam("name") String name,
+                            @ApiParam(value="View data", required = true)  @FormParam("data") String data) {
         try{
             long loggedInUserId = AuthHelper.getGuestId();
-            boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = coachingService.getCoachee(loggedInUserId, uid);
+            boolean accessAllowed = isOwnerOrAdmin(uid);
+            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
 
             if (!accessAllowed && coachee==null) {
                 uid = null;
@@ -625,14 +702,18 @@ public class BodyTrackController {
 
     @GET
     @Path("/users/{UID}/sources/list")
+    @ApiOperation(value="Retrieves a list of devices and channels that data can be retrieved from", response=BodyTrackHelper.SourcesResponse.class)
+    @ApiResponses({
+            @ApiResponse(code=403, message="In case of unauthorized access")
+    })
     @Produces({MediaType.APPLICATION_JSON})
-    public Response getSourceList(@PathParam("UID") Long uid) {
+    public Response getSourceList(@ApiParam(value= "User ID", required= true) @PathParam("UID") Long uid) {
         try{
             final long loggedInUserId = AuthHelper.getGuestId();
-            boolean accessAllowed = checkForPermissionAccess(uid);
+            boolean accessAllowed = isOwnerOrAdmin(uid);
             CoachingBuddy coachee = null;
             if (!accessAllowed) {
-                coachee = coachingService.getCoachee(loggedInUserId, uid);
+                coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
                 accessAllowed = (coachee!=null);
             }
             if (!accessAllowed){
@@ -647,12 +728,17 @@ public class BodyTrackController {
 
     @GET
     @Path(value = "/users/{UID}/sources/{source}/default_graph_specs")
+    @ApiOperation(value = "Retrieves the default grapher settings for a device", response=BodyTrackHelper.SourceInfo.class)
+    @ApiResponses({
+            @ApiResponse(code=403, message="In case of unauthorized access")
+    })
     @Produces({MediaType.APPLICATION_JSON})
-    public Response bodyTrackGetDefaultGraphSpecs(@PathParam("UID") Long uid, @PathParam("source") String name) {
+    public Response bodyTrackGetDefaultGraphSpecs(@ApiParam(value="User ID", required = true) @PathParam("UID") Long uid,
+                                                  @ApiParam(value="Device name", required=true) @PathParam("source") String name) {
         try{
             long loggedInUserId = AuthHelper.getGuestId();
-            boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = coachingService.getCoachee(loggedInUserId, uid);
+            boolean accessAllowed = isOwnerOrAdmin(uid);
+            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
 
             if (!accessAllowed && coachee==null) {
                 uid = null;
@@ -666,12 +752,16 @@ public class BodyTrackController {
 
     @GET
     @Path(value = "/users/{UID}/tags")
+    @ApiOperation(value = "Retrieve all tags for a user", response=Tag.class, responseContainer="Array")
+    @ApiResponses({
+            @ApiResponse(code=403, message="In case of unauthorized access")
+    })
     @Produces({MediaType.APPLICATION_JSON})
-    public Response getAllTagsForUser(@PathParam("UID") Long uid) {
+    public Response getAllTagsForUser(@ApiParam(value="User ID", required = true) @PathParam("UID") Long uid) {
         try {
             long loggedInUserId = AuthHelper.getGuestId();
-            boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = coachingService.getCoachee(loggedInUserId, uid);
+            boolean accessAllowed = isOwnerOrAdmin(uid);
+            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
             if (!accessAllowed && coachee == null) {
                 uid = null;
             }
@@ -684,11 +774,17 @@ public class BodyTrackController {
 
     @POST
     @Path("/users/{UID}/channels/{DeviceNickname}.{ChannelName}/set")
-    @Produces({MediaType.APPLICATION_JSON})
-    public Response setDefaultStyle(@PathParam("UID") Long uid, @PathParam("DeviceNickname") String deviceNickname,
-                                @PathParam("ChannelName") String channelName, @FormParam("user_default_style") String style) {
+    @ApiOperation(value = "Set the default style for a channel")
+    @ApiResponses({
+            @ApiResponse(code=200, message="Channel style set"),
+            @ApiResponse(code=403, message="In case of unauthorized access")
+    })
+    public Response setDefaultStyle(@ApiParam(value="User ID", required = true) @PathParam("UID") Long uid,
+                                    @ApiParam(value="Device name", required = true) @PathParam("DeviceNickname") String deviceNickname,
+                                    @ApiParam(value="Channel name", required = true) @PathParam("ChannelName") String channelName,
+                                    @ApiParam(value="Style data", required = true) @FormParam("user_default_style") String style) {
         try{
-            if (!checkForPermissionAccess(uid)){
+            if (!isOwnerOrAdmin(uid)){
                 uid = null;
             }
             bodyTrackHelper.setDefaultStyle(uid,deviceNickname,channelName,style);
@@ -701,16 +797,17 @@ public class BodyTrackController {
 
     @GET
     @Path("/timespans/{UID}/{ConnectorName}.{ObjectTypeName}/{Level}.{Offset}.json")
+    @ApiOperation(value = "Retrieve a timespan tile", response=TimespanTileResponse.class)
     @Produces({MediaType.APPLICATION_JSON})
-    public Response fetchTimespanTile(@PathParam("UID") Long uid,
-                                 @PathParam("ConnectorName") String connectorName,
-                                 @PathParam("ObjectTypeName") String objectTypeName,
-                                 @PathParam("Level") int level,
-                                 @PathParam("Offset") long offset) {
+    public Response fetchTimespanTile(@ApiParam(value="User ID", required = true) @PathParam("UID") Long uid,
+                                      @ApiParam(value="Connector Name", required = true) @PathParam("ConnectorName") String connectorName,
+                                      @ApiParam(value="Object Type Name", required = true) @PathParam("ObjectTypeName") String objectTypeName,
+                                      @ApiParam(value="Tile level", required = true) @PathParam("Level") int level,
+                                      @ApiParam(value="Tile offset", required = true) @PathParam("Offset") long offset) {
         try{
             long loggedInUserId = AuthHelper.getGuestId();
-            boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = coachingService.getCoachee(loggedInUserId, uid);
+            boolean accessAllowed = isOwnerOrAdmin(uid);
+            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
 
             if (!accessAllowed && coachee==null) {
                 uid = null;
@@ -723,14 +820,10 @@ public class BodyTrackController {
             List<ApiKey> keys = guestService.getApiKeys(uid);
             ApiKey api = null;
 
-            for (ApiKey key : keys){
-                Connector connector = key.getConnector();
-                if (connector.getName().equals(connectorName)||
-                    connector.getPrettyName().equals(connectorName)){
-                    api = key;
-                    break;
-                }
-            }
+            api = getApiKeyFromConnectorName(connectorName, keys, api);
+
+            if (coachee!=null && buddiesService.getSharedConnector(api.getId(), AuthHelper.getGuestId())==null)
+                return Response.status(Response.Status.UNAUTHORIZED).entity("Access Denied to connector " + connectorName).build();
 
             if (api == null) {
                 return Response.status(Response.Status.BAD_REQUEST).entity("Invalid Channel (null)").build();
@@ -753,10 +846,22 @@ public class BodyTrackController {
 
     }
 
-    private class TimespanTileResponse{
+    private ApiKey  getApiKeyFromConnectorName(String connectorName, List<ApiKey> keys, ApiKey api) {
+        for (ApiKey key : keys){
+            Connector connector = key.getConnector();
+            if (connector.getName().equals(connectorName)||
+                connector.getPrettyName().equals(connectorName)){
+                api = key;
+                break;
+            }
+        }
+        return api;
+    }
 
-        List<TimespanModel> data = new ArrayList<TimespanModel>();
-        String type = "timespan";
+    public class TimespanTileResponse{
+
+        public List<TimespanModel> data = new ArrayList<TimespanModel>();
+        public String type = "timespan";
 
         public TimespanTileResponse(List<TimespanModel> data){
             this.data = data;
@@ -766,26 +871,22 @@ public class BodyTrackController {
 
     @GET
     @Path("/photos/{UID}/{ConnectorPrettyName}.{ObjectTypeName}/{Level}.{Offset}.json")
+    @ApiOperation(value = "Retrieve a photo tile", response=PhotoItem.class)
+    @ApiResponses({
+            @ApiResponse(code=403, message="In case of unauthorized access")
+    })
     @Produces({MediaType.APPLICATION_JSON})
-    public Response fetchPhotoTile(@PathParam("UID") Long uid,
-                                 @PathParam("ConnectorPrettyName") String connectorPrettyName,
-                                 @PathParam("ObjectTypeName") String objectTypeName,
-                                 @PathParam("Level") int level,
-                                 @PathParam("Offset") long offset,
-                                 @QueryParam("tags") String tagsStr,
-                                 @QueryParam("tag-match") String tagMatchingStrategyName) {
+    public Response fetchPhotoTile(@ApiParam(value="User ID", required = true) @PathParam("UID") Long uid,
+                                   @ApiParam(value="Connector name", required = true) @PathParam("ConnectorPrettyName") String connectorPrettyName,
+                                   @ApiParam(value="Object type name", required = true) @PathParam("ObjectTypeName") String objectTypeName,
+                                   @ApiParam(value="Tile level", required = true) @PathParam("Level") int level,
+                                   @ApiParam(value="Tile offset", required = true) @PathParam("Offset") long offset,
+                                   @ApiParam(value="Tags for filtering", required = true) @QueryParam("tags") String tagsStr,
+                                   @ApiParam(value="Tag matching strategy", required = true) @QueryParam("tag-match") String tagMatchingStrategyName) {
         try {
-            long loggedInUserId = AuthHelper.getGuestId();
-            boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = coachingService.getCoachee(loggedInUserId, uid);
-
             final TagFilter.FilteringStrategy tagFilteringStrategy = TagFilter.FilteringStrategy.findByName(tagMatchingStrategyName);
 
-            if (!accessAllowed && coachee==null) {
-                uid = null;
-            }
-
-            if (uid == null) {
+            if (isUnauthorized(uid)) {
                 return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid User ID (null)").build();
             }
 
@@ -844,26 +945,25 @@ public class BodyTrackController {
 
     @GET
     @Path("/photos/{UID}/{ConnectorPrettyName}.{ObjectTypeName}/{unixTime}/{count}")
+    @ApiOperation(value="Get photos at a given time", response=PhotoItem.class)
+    @ApiResponses({
+            @ApiResponse(code=403, message="In case of unauthorized access")
+    })
     @Produces({MediaType.APPLICATION_JSON})
-    public Response getPhotosBeforeOrAfterTime(@PathParam("UID") long uid,
-                                             @PathParam("ConnectorPrettyName") String connectorPrettyName,
-                                             @PathParam("ObjectTypeName") String objectTypeName,
-                                             @PathParam("unixTime") double unixTimeInSecs,
-                                             @PathParam("count") int desiredCount,
-                                             @QueryParam("isBefore") boolean isGetPhotosBeforeTime,
-                                             @QueryParam("tags") String tagsStr,
-                                             @QueryParam("tag-match") String tagMatchingStrategyName
-                                             ) {
+    public Response getPhotosBeforeOrAfterTime(@ApiParam(value="User ID", required = true) @PathParam("UID") long uid,
+                                               @ApiParam(value="Connector name", required = true) @PathParam("ConnectorPrettyName") String connectorPrettyName,
+                                               @ApiParam(value="Object type name", required = true) @PathParam("ObjectTypeName") String objectTypeName,
+                                               @ApiParam(value="Timestamp (epoch seconds)", required = true) @PathParam("unixTime") double unixTimeInSecs,
+                                               @ApiParam(value="Photo count limit", required = true) @PathParam("count") int desiredCount,
+                                               @ApiParam(value="Is before time", required = true) @QueryParam("isBefore") boolean isGetPhotosBeforeTime,
+                                               @ApiParam(value="Tags for matching", required = true) @QueryParam("tags") String tagsStr,
+                                               @ApiParam(value="Tag matching strategy", required = true) @QueryParam("tag-match") String tagMatchingStrategyName) {
         try {
-            long loggedInUserId = AuthHelper.getGuestId();
-            boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = coachingService.getCoachee(loggedInUserId, uid);
-
             final TagFilter.FilteringStrategy tagFilteringStrategy = TagFilter.FilteringStrategy.findByName(tagMatchingStrategyName);
 
-            if (!accessAllowed && coachee==null) {
-                return Response.status(Response.Status.BAD_REQUEST).entity("Invalid User ID (null)").build();
-             }
+            if (isUnauthorized(uid)) {
+                return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid User ID (null)").build();
+            }
 
             final TagFilter tagFilter = TagFilter.create(Tag.parseTagsIntoStrings(tagsStr, Tag.COMMA_DELIMITER), tagFilteringStrategy);
             final SortedSet<PhotoService.Photo> photos = photoService.getPhotos(uid, (long)(unixTimeInSecs * 1000), connectorPrettyName, objectTypeName, desiredCount, isGetPhotosBeforeTime, tagFilter);
@@ -881,13 +981,25 @@ public class BodyTrackController {
         }
     }
 
+    public boolean isUnauthorized(Long uid) {
+        long loggedInUserId = AuthHelper.getGuestId();
+        boolean accessAllowed = isOwnerOrAdmin(uid);
+        CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
+
+        return !accessAllowed && coachee==null;
+    }
+
     @GET
     @Path("/metadata/{UID}/{ConnectorName}.{ObjectTypeName}/{facetId}/get")
+    @ApiOperation(value="Get the metadata for a facet", response=FacetMetadata.class)
     @Produces({MediaType.APPLICATION_JSON})
-    public Response getFacetMetadata(@PathParam("UID") Long uid,
-                                   final @PathParam("ConnectorName") String connectorName,
-                                   final @PathParam("ObjectTypeName") String objectTypeName,
-                                   final @PathParam("facetId") long facetId) {
+    public Response getFacetMetadata(@ApiParam(value="User ID", required = true) @PathParam("UID") Long uid,
+                                     @ApiParam(value="Connector name", required = true) final @PathParam("ConnectorName") String connectorName,
+                                     @ApiParam(value="Object type name", required = true) final @PathParam("ObjectTypeName") String objectTypeName,
+                                     @ApiParam(value="Facet ID", required = true) final @PathParam("facetId") long facetId) {
+        if (isUnauthorized(uid)) {
+            return Response.status(Response.Status.UNAUTHORIZED).build();
+        }
 
         return executeFacetMetaDataOperation(uid, connectorName, objectTypeName, facetId, new FacetMetaDataOperation() {
             @Override
@@ -900,13 +1012,17 @@ public class BodyTrackController {
 
     @POST
     @Path("/metadata/{UID}/{ConnectorName}.{ObjectTypeName}/{facetId}/set")
+    @ApiOperation(value="Set the metadata for a facet", response=FacetMetadata.class)
+    @ApiResponses({
+            @ApiResponse(code=403, message="In case of unauthorized access")
+    })
     @Produces({MediaType.APPLICATION_JSON})
-    public Response setFacetMetadata(final @PathParam("UID") long uid,
-                                     final @PathParam("ConnectorName") String connectorName,
-                                     final @PathParam("ObjectTypeName") String objectTypeName,
-                                     final @PathParam("facetId") long facetId,
-                                     final @FormParam("comment") String comment,
-                                     final @FormParam("tags") String tags) {
+    public Response setFacetMetadata(@ApiParam(value="User ID", required = true) final @PathParam("UID") long uid,
+                                     @ApiParam(value="Connector name", required = true) final @PathParam("ConnectorName") String connectorName,
+                                     @ApiParam(value="Object type name", required = true) final @PathParam("ObjectTypeName") String objectTypeName,
+                                     @ApiParam(value="Facet ID", required = true) final @PathParam("facetId") long facetId,
+                                     @ApiParam(value="Comment", required = true) final @FormParam("comment") String comment,
+                                     @ApiParam(value="Tags", required = true) final @FormParam("tags") String tags) {
 
         // don't bother doing anything if comment and tags are both null
         if (comment != null || tags != null) {
@@ -932,9 +1048,42 @@ public class BodyTrackController {
         return jsonResponseHelper.badRequest("Nothing changed since comment and tags were both null");
     }
 
-    private static class FacetMetadata {
-        private String comment;
-        private SortedSet<String> tags = new TreeSet<String>();
+    @DELETE
+    @Path("/photo/{UID}/{facetId}")
+    @ApiOperation(value="Delete a FluxtreamCapture photo")
+    @ApiResponses({
+            @ApiResponse(code=200, message="n/a"),
+            @ApiResponse(code=403, message="In case of unauthorized access")
+    })
+    public Response deletePhoto(@ApiParam(value="User ID", required = true) final @PathParam("UID") long uid,
+                                @ApiParam(value="Facet ID", required = true) final @PathParam("facetId") long facetId) {
+        // only the photo's owner (or admin) is allowed to delete a photo
+        if (!isOwnerOrAdmin(uid))
+            return Response.status(Response.Status.UNAUTHORIZED).build();
+
+        return executeFacetMetaDataOperation(uid, "FluxtreamCapture", "photo", facetId, new FacetMetaDataOperation() {
+            @Override
+            @NotNull
+            public Response executeOperation(@NotNull final AbstractFacet facet) {
+                FluxtreamCapturePhotoFacet photoFacet = (FluxtreamCapturePhotoFacet) facet;
+                final String photoStoreKey = FluxtreamCapturePhoto.createPhotoStoreKey(photoFacet.guestId, photoFacet.getCaptureYYYYDDD(), photoFacet.start, photoFacet.getHash());
+                try {
+                    fluxtreamCapturePhotoStore.deletePhoto(photoStoreKey);
+                    facetDao.delete(facet);
+                } catch (FluxtreamCapturePhotoStore.StorageException e) {
+                    return Response.serverError().build();
+                }
+                return Response.status(Response.Status.OK).build();
+            }
+        });
+
+    }
+
+    @ApiModel
+    public static class FacetMetadata {
+        @ApiModelProperty(value="The facet's user comment (if any)", required=true)
+        public String comment;
+        public SortedSet<String> tags = new TreeSet<String>();
 
         private FacetMetadata(@NotNull AbstractFacet facet) {
             this.comment = facet.comment;
@@ -965,9 +1114,9 @@ public class BodyTrackController {
                 Long loggedInUserId = null;
                 try {
                     loggedInUserId = AuthHelper.getGuestId();
-                    accessAllowed = checkForPermissionAccess(uid);
+                    accessAllowed = isOwnerOrAdmin(uid);
                     if (!accessAllowed) {
-                        final CoachingBuddy coachee = coachingService.getCoachee(loggedInUserId, uid);
+                        final CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
                         if (coachee != null) {
                             accessAllowed = coachee.hasAccessToConnector(connector.getName());
                         }
@@ -1039,32 +1188,51 @@ public class BodyTrackController {
         }
     }
 
-    private boolean checkForPermissionAccess(long targetUid){
+    private boolean isOwnerOrAdmin(long targetUid){
         Guest guest = AuthHelper.getGuest();
         return targetUid == guest.getId() || guest.hasRole(Guest.ROLE_ADMIN);
     }
 
-    private static class PhotoItem {
+    @ApiModel
+    public static class PhotoItem {
         private static final DateTimeFormatter DATE_TIME_FORMATTER = ISODateTimeFormat.dateTime();
 
-        boolean nsfw = false;
-        String id;
-        String description;
-        String comment;
-        double begin_d;
-        String begin;
-        double end_d;
-        String end;
-        String dev_id;
-        String dev_nickname;
-        String object_type_name;
-        String channel_name;
-        String url;
-        ArrayList<String> tags = new ArrayList<String>();
-        ArrayList<PhotoItemThumbnail> thumbnails = new ArrayList<PhotoItemThumbnail>();
-        int count = 1;
-        int orientation;
-        String time_type;
+        @ApiModelProperty(value="Not Safe For Work", required=true)
+        public boolean nsfw = false;
+        @ApiModelProperty
+        public String id;
+        @ApiModelProperty
+        public String description;
+        @ApiModelProperty
+        public String comment;
+        @ApiModelProperty
+        public double begin_d;
+        @ApiModelProperty
+        public String begin;
+        @ApiModelProperty
+        public double end_d;
+        @ApiModelProperty
+        public String end;
+        @ApiModelProperty
+        public String dev_id;
+        @ApiModelProperty
+        public String dev_nickname;
+        @ApiModelProperty
+        public String object_type_name;
+        @ApiModelProperty
+        public String channel_name;
+        @ApiModelProperty
+        public String url;
+        @ApiModelProperty
+        public ArrayList<String> tags = new ArrayList<String>();
+        @ApiModelProperty
+        public ArrayList<PhotoItemThumbnail> thumbnails = new ArrayList<PhotoItemThumbnail>();
+        @ApiModelProperty
+        public int count = 1;
+        @ApiModelProperty
+        public int orientation;
+        @ApiModelProperty
+        public String time_type;
 
         public PhotoItem(final PhotoService.Photo photo) {
             final AbstractPhotoFacetVO photoFacetVO = photo.getAbstractPhotoFacetVO();
@@ -1148,27 +1316,35 @@ public class BodyTrackController {
         }
     }
 
-    private static final class BodyTrackUploadResponse {
+    @ApiModel(value = "Upload response returned from BodyTrack datastore.")
+    public static final class BodyTrackUploadResponse {
         // We only store the bare minimum here because it might be a security/privacy issue to include everything (Randy
         // explained to Chris on 2012.10.31 that we probably don't want to make channel ranges and such visible by
         // default.  Plus, if debugging is on in the datastore, file paths might also be included in the response JSON).
-        String successful_records;
-        String failed_records;
-        String failure;
+        @ApiModelProperty(value = "Number of data points successfully added", required = true)
+        public String successful_records;
+        @ApiModelProperty(value = "Number of data points unsuccessfully added", required = true)
+        public String failed_records;
+        @ApiModelProperty(value = "Whether the upload failed", required = true)
+        public String failure;
     }
 
-    private class PhotoUploadResponsePayload {
+    @ApiModel
+    public class PhotoUploadResponsePayload {
         @NotNull
         @Expose
-        private final String operation;
+        @ApiModelProperty
+        public final String operation;
 
         @NotNull
         @Expose
-        private final String key;
+        @ApiModelProperty
+        public final String key;
 
         @Nullable
         @Expose
-        private final Long id;
+        @ApiModelProperty
+        public final Long id;
 
         public PhotoUploadResponsePayload(@NotNull final FluxtreamCapturePhotoStore.Operation operation, @Nullable final Long databaseRecordId, @NotNull final String photoStoreKey) {
             this.id = databaseRecordId;

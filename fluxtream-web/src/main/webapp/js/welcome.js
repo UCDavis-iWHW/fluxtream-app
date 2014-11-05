@@ -48,6 +48,10 @@ $(document).ready(function() {
         while (match = search.exec(query))
             params[decode(match[1])] = decode(match[2]);
     })();
+    if (typeof params["signIn"] != "undefined"){
+      enterCredentials();
+    }
+
     $('#toggleLoginPanel').click(function() {
         if ($('#login').is(':visible')) {
             $('#login').slideUp();
@@ -75,10 +79,27 @@ $(document).ready(function() {
         return false;
     });
 
+    $('#xslostPasswdLink').click(function() {
+        $('#xsLoginForm').hide();
+        $('#xsRecoverForm').show();
+        $('#xsRecoverForm').submit(function() { $(this).ajaxSubmit({success: handleRecoverCallback }); return false; });
+        $('#xsRecover_email').focus();
+        $("#xsLoginFormTitle").html("Forgot password?");
+        return false;
+    });
+
     $('#cancelRecoverPassword').click(function() {
         $('#recoverForm').hide();
         $('#loginForm').show();
         $('#f_username').focus();
+        return false;
+    });
+
+    $('#xsCancelRecoverPassword').click(function() {
+        $('#xsRecoverForm').hide();
+        $('#xsLoginForm').show();
+        $('#f_username_xs').focus();
+        $("#xsLoginFormTitle").html("Please log in");
         return false;
     });
 
@@ -109,15 +130,21 @@ $(document).ready(function() {
     }
     if (typeof params["accessDenied"] != "undefined"){
         $("#accessDeniedModal").modal();
-        $('#login').slideDown();
     }
     if (typeof params["username"] != "undefined"){
+        console.log(params["username"]);
+        $("#f_username").val(params["username"]);
         $("#loginFailedModal").modal();
     }
     else if (typeof params["subscribed"] != "undefined"){
         $("#subscribedModal").modal();
     }
-});
+
+    $(".please-expand" ).click(function() {
+        $( ".connector-img-cloud" ).toggleClass( "connector-img-cloud-open" );
+    });
+
+    });
 
 
 function submitCreateAccountForm() {
@@ -155,6 +182,11 @@ function createAccount(isDeveloperAccount) {
             $("#submitCreateAccountForm").click(submitCreateAccountForm);
         }
     })
+}
+
+function enterCredentials() {
+  $("#xsLoginDialog").modal();
+  $("#f_username_xs").focus();
 }
 
 function showLightbox(index) {

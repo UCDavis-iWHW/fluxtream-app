@@ -412,6 +412,10 @@ define(["core/grapher/BTCore","applications/calendar/tabs/list/ListUtils", "core
                                 channelListItem = $(channeListItemTemplate.render(channel));
                                 channelList.append(channelListItem);
                             }
+                            else{
+                                //This must be done because the ids sometimes get offset from each other
+                                channelListItem[0].id = channel.id;
+                            }
                         }
                         channelRemoveList.remove();
 
@@ -975,7 +979,7 @@ define(["core/grapher/BTCore","applications/calendar/tabs/list/ListUtils", "core
 
             var plot = null;
             if ("timespan" == channel["type"]){
-                plot = new TimespanSeriesPlot(timespanDatasource(App.buddyToAccess.id, channel["device_name"], channel["channel_name"]), grapher.dateAxis,
+                plot = new TimespanSeriesPlot(timespanDatasource(channel["device_name"], channel["channel_name"]), grapher.dateAxis,
                     yAxis,
                     {"style": channel["style"], "localDisplay": channel["time_type"] == "local"});
                 plot.addDataPointListener(timespanDataPointListener(grapher,plot));
@@ -995,7 +999,7 @@ define(["core/grapher/BTCore","applications/calendar/tabs/list/ListUtils", "core
                 }
                 // if defined, we must use the object_type_name here and not the channel_name!
                 var objectTypeOrChannelName = (typeof channel["object_type_name"] === 'undefined' ? channel["channel_name"] : channel["object_type_name"]);
-                plot = new PhotoSeriesPlot(photoDatasource(App.buddyToAccess.id, channel["device_name"], objectTypeOrChannelName, tags, matchingStrategy),
+                plot = new PhotoSeriesPlot(photoDatasource(channel["device_name"], objectTypeOrChannelName, tags, matchingStrategy),
                     grapher.dateAxis,
                     yAxis,
                     App.buddyToAccess.id,
@@ -1025,7 +1029,7 @@ define(["core/grapher/BTCore","applications/calendar/tabs/list/ListUtils", "core
                 //			plot.addDataPointListener(commentDataPointListener(channelElementId));
             } else {
                 // Set up the plot and axes for this channel using the grapher API
-                plot = new DataSeriesPlot(channelDatasource(App.buddyToAccess.id, channel["device_name"], channel["channel_name"]),
+                plot = new DataSeriesPlot(channelDatasource(channel["device_name"], channel["channel_name"]),
                     grapher.dateAxis,
                     yAxis,
                     {"style": channel["style"], "localDisplay": channel["time_type"] == "local"});
@@ -1422,7 +1426,7 @@ define(["core/grapher/BTCore","applications/calendar/tabs/list/ListUtils", "core
 
                     // we must use the object_type_name here and not the channel_name!
                     var objectTypeOrChannelName = (typeof channel["object_type_name"] === 'undefined' ? channel["channel_name"] : channel["object_type_name"]);
-                    plot.setDatasource(photoDatasource(App.buddyToAccess.id,
+                    plot.setDatasource(photoDatasource(
                         channel["device_name"],
                         objectTypeOrChannelName,
                         newStyle['filters']["tag"]["tags"],
@@ -1595,6 +1599,8 @@ define(["core/grapher/BTCore","applications/calendar/tabs/list/ListUtils", "core
             if (commentsStyle['fill'] && (commentsStyle['type'] == 'point' || commentsStyle['type'] == 'square')) {
                 commentsStyle['type-ui'] += '-filled';
             }
+
+            $("#" + channelId + "-config-zeo-show")[0].checked = isZeo;
 
             // don't show this section if this is a Zeo plot
             $("#" + channelId + "-config-lines").toggle(!isZeo);
@@ -2115,7 +2121,7 @@ define(["core/grapher/BTCore","applications/calendar/tabs/list/ListUtils", "core
 
         return function (pointObj, sourceInfo){
             var timespanObject = sourceInfo.info.timespanInfo;
-            $.ajax("/api/v1/connectors/" + timespanObject.objectType + "/data?start=" + timespanObject.start * 1000 + "&end=" + timespanObject.end * 1000 + "&value=" + encodeURIComponent(timespanObject.value),{
+            $.ajax(App.apiUri("/api/v1/connectors/" + timespanObject.objectType + "/data?buddyToAccess={buddyToAccess.id}&start=" + timespanObject.start * 1000 + "&end=" + timespanObject.end * 1000 + "&value=" + encodeURIComponent(timespanObject.value)),{
                 success: function(facets){
                     $.ajax("/api/v1/metadata/cities?start=" + timespanObject.start * 1000 + "&end=" + timespanObject.end * 1000,{
                         success: function(cities){

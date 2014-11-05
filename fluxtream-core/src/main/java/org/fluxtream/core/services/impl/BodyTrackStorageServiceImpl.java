@@ -1,33 +1,24 @@
 package org.fluxtream.core.services.impl;
 
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Hashtable;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.TimeZone;
+import org.apache.commons.lang.StringUtils;
 import org.fluxtream.core.Configuration;
 import org.fluxtream.core.SimpleTimeInterval;
 import org.fluxtream.core.TimeInterval;
 import org.fluxtream.core.TimeUnit;
+import org.fluxtream.core.aspects.FlxLogger;
 import org.fluxtream.core.connectors.Connector;
 import org.fluxtream.core.connectors.ObjectType;
 import org.fluxtream.core.domain.AbstractFacet;
 import org.fluxtream.core.domain.ApiKey;
-import org.fluxtream.core.services.ApiDataService;
-import org.fluxtream.core.services.BodyTrackStorageService;
-import org.fluxtream.core.services.DataUpdateService;
-import org.fluxtream.core.services.GuestService;
-import org.fluxtream.core.services.MetadataService;
-import org.apache.commons.lang.StringUtils;
-import org.fluxtream.core.aspects.FlxLogger;
+import org.fluxtream.core.services.*;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
+
+import java.lang.reflect.Field;
+import java.util.*;
 
 @Service
 @Component
@@ -125,8 +116,11 @@ public class BodyTrackStorageServiceImpl implements BodyTrackStorageService {
 
     private List<BodyTrackHelper.BodyTrackUploadResult> uploadIntradayData(long guestId, List<AbstractFacet> deviceFacets, FieldHandler fieldHandler) {
         List<BodyTrackHelper.BodyTrackUploadResult> results = new ArrayList<BodyTrackHelper.BodyTrackUploadResult>();
-        for (AbstractFacet deviceFacet : deviceFacets)
-            results.addAll(fieldHandler.handleField(guestId, deviceFacet));
+        for (AbstractFacet deviceFacet : deviceFacets) {
+            List<BodyTrackHelper.BodyTrackUploadResult> facetResults = fieldHandler.handleField(guestId, deviceFacet);
+            if (facetResults != null)
+                results.addAll(facetResults);
+        }
         return results;
     }
 
@@ -141,7 +135,7 @@ public class BodyTrackStorageServiceImpl implements BodyTrackStorageService {
     }
 
     private List<String> getDailyDatastoreChannelNames(String facetName) {
-        String[] channelNamesMappings = env.bodytrackProperties.getStringArray(facetName + ".channel_names");
+        String[] channelNamesMappings = env.bodytrackProperties.getString(facetName + ".channel_names").split(",");
         List<String> channelNames = new ArrayList<String>();
         for (String mapping : channelNamesMappings) {
             String[] terms = StringUtils.split(mapping, ":");
@@ -153,7 +147,7 @@ public class BodyTrackStorageServiceImpl implements BodyTrackStorageService {
     }
 
     private List<String> getFacetColumnNames(String facetName) {
-        String[] channelNamesMappings = env.bodytrackProperties.getStringArray(facetName + ".channel_names");
+        String[] channelNamesMappings = env.bodytrackProperties.getString(facetName + ".channel_names").split(",");
         List<String> channelNames = new ArrayList<String>();
         for (String mapping : channelNamesMappings) {
             String[] terms = StringUtils.split(mapping, ":");
@@ -165,7 +159,7 @@ public class BodyTrackStorageServiceImpl implements BodyTrackStorageService {
     }
 
     private List<FieldHandler> getFieldHandlers(String facetName) {
-        String[] channelNamesMappings = env.bodytrackProperties.getStringArray(facetName + ".channel_names");
+        String[] channelNamesMappings = env.bodytrackProperties.getString(facetName + ".channel_names").split(",");
         List<FieldHandler> fieldHandlers = new ArrayList<FieldHandler>();
         for (String mapping : channelNamesMappings) {
             String[] terms = StringUtils.split(mapping, ":");
@@ -254,5 +248,19 @@ public class BodyTrackStorageServiceImpl implements BodyTrackStorageService {
 		List<AbstractFacet> facets = apiDataService.getApiDataFacets(apiKey, null, timeInterval);
 		storeApiData(apiKey.getGuestId(), facets);
 	}
+
+    @Override
+    public void storeInitialHistory(ApiKey apiKey, int objectTypes) {
+        logger.info("module=updateQueue component=bodytrackStorageService action=storeInitialHistory" +
+                " objectTypes=" + objectTypes +
+                " guestId=" + apiKey.getGuestId() + " connector=" + apiKey.getConnector().getName());
+        TimeInterval timeInterval = new SimpleTimeInterval(0,
+                System.currentTimeMillis(), TimeUnit.ARBITRARY, TimeZone.getDefault());
+        final ObjectType[] objectTypesForValue = apiKey.getConnector().getObjectTypesForValue(objectTypes);
+        for (ObjectType objectType : objectTypesForValue) {
+            List<AbstractFacet> facets = apiDataService.getApiDataFacets(apiKey, objectType, timeInterval);
+            storeApiData(apiKey.getGuestId(), facets);
+        }
+    }
 
 }

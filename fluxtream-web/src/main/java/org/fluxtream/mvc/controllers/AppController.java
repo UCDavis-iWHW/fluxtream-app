@@ -1,12 +1,5 @@
 package org.fluxtream.mvc.controllers;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.security.NoSuchAlgorithmException;
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import org.fluxtream.core.Configuration;
 import org.fluxtream.core.aspects.FlxLogger;
 import org.fluxtream.core.auth.AuthHelper;
@@ -14,12 +7,7 @@ import org.fluxtream.core.connectors.Connector;
 import org.fluxtream.core.domain.ApiKey;
 import org.fluxtream.core.domain.Guest;
 import org.fluxtream.core.domain.Notification.Type;
-import org.fluxtream.core.services.ApiDataService;
-import org.fluxtream.core.services.CoachingService;
-import org.fluxtream.core.services.ConnectorUpdateService;
-import org.fluxtream.core.services.GuestService;
-import org.fluxtream.core.services.MetadataService;
-import org.fluxtream.core.services.NotificationsService;
+import org.fluxtream.core.services.*;
 import org.fluxtream.core.utils.SecurityUtils;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +19,14 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
+
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.File;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.security.NoSuchAlgorithmException;
 
 @Controller
 public class AppController {
@@ -56,7 +52,7 @@ public class AppController {
     ConnectorUpdateService connectorUpdateService;
 
     @Autowired
-    CoachingService coachingService;
+    BuddiesService buddiesService;
 
     @Autowired
 	BeanFactory beanFactory;
@@ -70,9 +66,7 @@ public class AppController {
         response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate"); // HTTP 1.1.
         response.setHeader("Pragma", "no-cache"); // HTTP 1.0.
         response.setDateHeader("Expires", 0);
-        Authentication auth = SecurityContextHolder.getContext()
-                .getAuthentication();
-        if (auth != null && auth.isAuthenticated())
+        if (AuthHelper.isFullyAuthenticated())
             return new ModelAndView("redirect:/app");
         String indexPageName = "default";
         if (env.get("homepage.name")!=null)
@@ -160,7 +154,7 @@ public class AppController {
 
         String release = env.get("release");
 		request.setAttribute("guestName", guest.getGuestName());
-        request.setAttribute("coachees", coachingService.getCoachees(guestId));
+        request.setAttribute("coachees", buddiesService.getTrustingBuddies(guestId));
         request.setAttribute("useMinifiedJs", Boolean.valueOf(env.get("useMinifiedJs")));
 
 		if (SecurityUtils.isDemoUser())
@@ -212,7 +206,7 @@ public class AppController {
         // always reset the target user to the logged in user when the app starts (or a browser reload happens)
         AuthHelper.as(null);
 		if (!hasTimezoneCookie(request)|| AuthHelper.getGuest()==null)
-			return new ModelAndView("redirect:/welcome");
+			return new ModelAndView("redirect:/welcome?signIn");
         SavedRequest savedRequest =
                 new HttpSessionRequestCache().getRequest(request, response);
         if (savedRequest!=null) {

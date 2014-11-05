@@ -3,6 +3,8 @@ package org.fluxtream.core.auth;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.fluxtream.core.Configuration;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
@@ -25,6 +27,9 @@ import java.util.Map;
 public class FlxSavedRequestAwareAuthenticationSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
     protected final Log logger = LogFactory.getLog(this.getClass());
+
+    @Autowired
+    Configuration env;
 
     private RequestCache requestCache = new HttpSessionRequestCache();
 
@@ -52,13 +57,13 @@ public class FlxSavedRequestAwareAuthenticationSuccessHandler extends SimpleUrlA
             getRedirectStrategy().sendRedirect(request, response, requestRedirect);
         }
 
-        if (savedRequest == null) {
-            super.onAuthenticationSuccess(request, response, authentication);
-            return;
-        } else {
-            // if saved request was an ajax call, ignore it
-            if (savedRequest.getRedirectUrl().indexOf("/api/")!=-1) {
-                super.onAuthenticationSuccess(request, response, authentication);
+        if (savedRequest != null) {
+            // if saved request was an ajax call or targeting a simple asset, ignore it
+            if (savedRequest.getRedirectUrl().indexOf("/api/")!=-1||
+                savedRequest.getRedirectUrl().indexOf(env.get("release"))!=-1||
+                savedRequest.getRedirectUrl().indexOf("static/")!=-1) {
+                requestCache.removeRequest(request, response);
+                getRedirectStrategy().sendRedirect(request, response, getDefaultTargetUrl());
                 return;
             }
         }

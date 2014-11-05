@@ -108,7 +108,7 @@ define(["core/TabInterface", "core/DateUtils"], function(TabInterface, DateUtils
         $('<a/>', {
             href: "#",
             id: "flx-connector-btn-" + connector.connectorName,
-            class: "flx-active"
+            class: "flx-active flx-connector-btn"
         }).click(function(event){
             event.preventDefault();
             $(document).click(); //needed for click away to work on tooltips in clock tab
@@ -132,11 +132,13 @@ define(["core/TabInterface", "core/DateUtils"], function(TabInterface, DateUtils
     }
 
     function bindConnectorButtons(App, Calendar) {
+        var url = "/api/v1/connectors/installed";
+        if (App.buddyToAccess["isBuddy"]) url += "?"+App.BUDDY_TO_ACCESS_PARAM+"="+App.buddyToAccess["id"];
         $.ajax({
-            beforeSend: function(xhr){if(!_.isUndefined(App.viewee)){xhr.setRequestHeader(App.COACHEE_BUDDY_TO_ACCESS_HEADER, App.viewee);}},
-            url: "/api/v1/connectors/installed",
+            url: url,
             async: false,
             success: function(response) {
+                $("#selectedConnectors").empty();
                 $.each(response, function(i, connector) {
                     createConnectorButton(App, Calendar, connector);
                     connectorNames.push(connector.connectorName);
@@ -289,7 +291,7 @@ define(["core/TabInterface", "core/DateUtils"], function(TabInterface, DateUtils
     };
 
 	function updateTab(digest, Calendar, force) {
-        if (App.activeApp.name != "calendar")
+        if (App.activeApp.name != "calendar" || digest == null)
             return;
         tabInterface.setRenderParamsFunction(function(){
             return $.extend({
@@ -323,6 +325,16 @@ define(["core/TabInterface", "core/DateUtils"], function(TabInterface, DateUtils
             if (button.length == 0){
                 button = createConnectorButton(App,Calendar,digest.selectedConnectors[i]);
             }
+            var connector = digest.selectedConnectors[i];
+            var connected = _.some(connector.facetTypes, function(facetType) {
+                var hasTypedFacets = digest.facets[facetType] != null;
+                //var objectType = facetType.split("-")[1];
+                if(Calendar.currentTab.name==="photos") {
+                    hasTypedFacets = hasTypedFacets && digest.facets[facetType].hasImages;
+                }
+                return hasTypedFacets;
+            });
+            button.toggleClass("flx-disconnected", !connected);
             if (Calendar.currentTab.connectorDisplayable(digest.selectedConnectors[i])){
                 button.show();
                 if (Calendar.currentTab.connectorsAlwaysEnabled()){
@@ -333,6 +345,21 @@ define(["core/TabInterface", "core/DateUtils"], function(TabInterface, DateUtils
             else
                 button.hide();
         }
+        // only show filter buttons for the current viewees' selected connectors
+        $(".flx-connector-btn").each(function(index){
+            var existing_btn_id = $(this).attr("id");
+            var btn_to_remove = true;
+            for (var i = 0; i < digest.selectedConnectors.length; i++) {
+                var connector_btn_id = "flx-connector-btn-" + digest.selectedConnectors[i].connectorName;
+                if (connector_btn_id===existing_btn_id) {
+                    btn_to_remove = false;
+                    break;
+                }
+            }
+            if (btn_to_remove) {
+                $("#"+existing_btn_id).remove();
+            }
+        });
 
     }
 	

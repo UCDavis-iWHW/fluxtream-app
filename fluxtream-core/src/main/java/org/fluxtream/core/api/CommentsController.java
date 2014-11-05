@@ -1,8 +1,6 @@
 package org.fluxtream.core.api;
 
-import com.wordnik.swagger.annotations.Api;
-import com.wordnik.swagger.annotations.ApiOperation;
-import com.wordnik.swagger.annotations.ApiParam;
+import com.wordnik.swagger.annotations.*;
 import org.apache.commons.lang.StringUtils;
 import org.fluxtream.core.auth.AuthHelper;
 import org.fluxtream.core.services.ApiDataService;
@@ -37,8 +35,11 @@ public class CommentsController {
      */
     @POST
     @Path("/{facetType}/{facetId}")
-    @Produces({MediaType.APPLICATION_JSON})
-    @ApiOperation(value = "Set a facet's user comment", response = String.class)
+    @Produces({MediaType.TEXT_PLAIN})
+    @ApiOperation(value = "Set a facet's user comment")
+    @ApiResponses({
+            @ApiResponse(code=200, message = "Comment was set")
+    })
     public Response setComment(@ApiParam(value="The type (<connectorName>-<objectTypeName>) of the facet", required=true) @PathParam("facetType") String facetType,
                                   @ApiParam(value="Facet ID", required=true) @PathParam("facetId") long facetId,
                                   @ApiParam(value="Comment", required=true) @FormParam("comment") String comment) {
@@ -68,12 +69,15 @@ public class CommentsController {
     @DELETE
     @Path("/{facetType}/{facetId}")
     @ApiOperation(value = "Delete a facet's user comment", response = String.class)
-    @Produces({MediaType.APPLICATION_JSON})
+    @ApiResponses({
+            @ApiResponse(code=200, message = "Comment was removed")
+    })
+    @Produces({MediaType.TEXT_PLAIN})
     public Response deleteComment(@ApiParam(value="The type (<connectorName>-<objectTypeName>) of the facet", required=true) @PathParam("facetType") String facetType,
                                      @ApiParam(value="Facet ID", required=true) @PathParam("facetId") long facetId) {
         final long guestId = AuthHelper.getGuestId();
         String connectorName, objectTypeName = null;
-        if (facetType.indexOf("-")!=-1)
+        if (facetType.indexOf("-")==-1)
             connectorName = facetType;
         else {
             final String[] splits = StringUtils.split(facetType, "-");

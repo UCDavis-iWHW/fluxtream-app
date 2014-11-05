@@ -5,7 +5,7 @@ import org.fluxtream.core.auth.AuthHelper;
 import org.fluxtream.core.connectors.Connector;
 import org.fluxtream.core.connectors.SharedConnectorFilter;
 import org.fluxtream.core.domain.*;
-import org.fluxtream.core.services.CoachingService;
+import org.fluxtream.core.services.BuddiesService;
 import org.fluxtream.core.services.GuestService;
 import org.fluxtream.core.utils.JPAUtils;
 import org.springframework.beans.factory.BeanFactory;
@@ -24,9 +24,9 @@ import java.util.List;
  */
 @Service
 @Transactional(readOnly=true)
-public class CoachingServiceImpl implements CoachingService {
+public class BuddiesServiceImpl implements BuddiesService {
 
-    Logger logger = Logger.getLogger(CoachingServiceImpl.class);
+    Logger logger = Logger.getLogger(BuddiesServiceImpl.class);
 
     @Autowired
     GuestService guestService;
@@ -39,9 +39,9 @@ public class CoachingServiceImpl implements CoachingService {
 
     @Override
     @Transactional(readOnly=false)
-    public void addCoach(final long guestId, final String username) {
+    public void addTrustedBuddy(final long guestId, final String username) {
         final Guest buddyGuest = guestService.getGuest(username);
-        if (getCoach(guestId, username)==null) {
+        if (getTrustedBuddy(guestId, username)==null) {
             CoachingBuddy buddy = new CoachingBuddy();
             buddy.guestId = guestId;
             buddy.buddyId = buddyGuest.getId();
@@ -53,7 +53,7 @@ public class CoachingServiceImpl implements CoachingService {
 
     @Override
     @Transactional(readOnly=false)
-    public void removeCoach(final long guestId, final String username) {
+    public void removeTrustedBuddy(final long guestId, final String username) {
         final Guest buddyGuest = guestService.getGuest(username);
         if (buddyGuest==null) return;
         final CoachingBuddy coachingBuddy = JPAUtils.findUnique(em, CoachingBuddy.class,
@@ -119,18 +119,19 @@ public class CoachingServiceImpl implements CoachingService {
     }
 
     @Override
-    public List<Guest> getCoaches(final long guestId) {
+    public List<Guest> getTrustedBuddies(final long guestId) {
         final List<CoachingBuddy> coachingBuddies = JPAUtils.find(em, CoachingBuddy.class, "coachingBuddies.byGuestId", guestId);
         final List<Guest> coaches = new ArrayList<Guest>();
         for (CoachingBuddy sharingBuddy : coachingBuddies) {
             final Guest buddyGuest = guestService.getGuestById(sharingBuddy.buddyId);
-            coaches.add(buddyGuest);
+            if (buddyGuest!=null)
+                coaches.add(buddyGuest);
         }
         return coaches;
     }
 
     @Override
-    public List<Guest> getCoachees(final long guestId) {
+    public List<Guest> getTrustingBuddies(final long guestId) {
         final List<CoachingBuddy> coacheeBuddies = JPAUtils.find(em, CoachingBuddy.class, "coachingBuddies.byBuddyId", guestId);
         final List<Guest> coachees = new ArrayList<Guest>();
         for (CoachingBuddy sharingBuddy : coacheeBuddies) {
@@ -141,7 +142,7 @@ public class CoachingServiceImpl implements CoachingService {
     }
 
     @Override
-    public CoachingBuddy getCoach(final long guestId, final String username) {
+    public CoachingBuddy getTrustedBuddy(final long guestId, final String username) {
         final Guest buddyGuest = guestService.getGuest(username);
         if (buddyGuest==null) return null;
         final CoachingBuddy coachingBuddy = JPAUtils.findUnique(em, CoachingBuddy.class,
@@ -151,7 +152,7 @@ public class CoachingServiceImpl implements CoachingService {
     }
 
     @Override
-    public CoachingBuddy getCoachee(final long guestId, final String username) {
+    public CoachingBuddy getTrustingBuddy(final long guestId, final String username) {
         final Guest buddyGuest = guestService.getGuest(username);
         if (buddyGuest==null) return null;
         final CoachingBuddy coachingBuddy = JPAUtils.findUnique(em, CoachingBuddy.class,
@@ -161,7 +162,7 @@ public class CoachingServiceImpl implements CoachingService {
     }
 
     @Override
-    public CoachingBuddy getCoachee(final long guestId, final long coacheeId) {
+    public CoachingBuddy getTrustingBuddy(final long guestId, final long coacheeId) {
         final CoachingBuddy coachingBuddy = JPAUtils.findUnique(em, CoachingBuddy.class, "coachingBuddies.byGuestAndBuddyId", coacheeId, guestId);
         return coachingBuddy;
     }
@@ -198,6 +199,12 @@ public class CoachingServiceImpl implements CoachingService {
                                                             "sharedConnector.byConnectorNameAndViewerId",
                                                                 apiKey.getConnector().getName(), viewerId);
         return sconn;
+    }
+
+    @Override
+    public List<SharedConnector> getSharedConnectors(long trustedBuddyId, long trustingBuddyId) {
+        final List<SharedConnector> conns = JPAUtils.find(em, SharedConnector.class, "sharedConnector.byTrustedBuddyId", trustingBuddyId, trustedBuddyId);
+        return conns;
     }
 
     @Override

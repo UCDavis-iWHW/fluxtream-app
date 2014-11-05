@@ -74,7 +74,7 @@ public class ConnectorStore {
     ObjectMapper mapper = new ObjectMapper();
 
     @Autowired
-    private CoachingService coachingService;
+    private BuddiesService buddiesService;
 
     public ConnectorStore() {
         GsonBuilder gsonBuilder = new GsonBuilder();
@@ -156,9 +156,9 @@ public class ConnectorStore {
             @ApiResponse(code = 401, message = "You are no longer logged in"),
             @ApiResponse(code = 403, message = "Buddy-to-access authorization has been revoked")
     })
-    public Response getInstalledConnectors(@ApiParam(value="Buddy to access username Header (" + CoachingService.BUDDY_TO_ACCESS_HEADER + ")", required=false) @HeaderParam(CoachingService.BUDDY_TO_ACCESS_HEADER) String coacheeUsernameHeader){
+    public Response getInstalledConnectors(@ApiParam(value="Buddy to access username parameter (" + BuddiesService.BUDDY_TO_ACCESS_PARAM + ")", required=false) @QueryParam(BuddiesService.BUDDY_TO_ACCESS_PARAM) String buddyToAccessParameter){
         CoachingBuddy coachee;
-        try { coachee = AuthHelper.getCoachee(coacheeUsernameHeader, coachingService);
+        try { coachee = AuthHelper.getCoachee(buddyToAccessParameter, buddiesService);
         } catch (CoachRevokedException e) {return Response.status(403).entity("Sorry, permission to access this data has been revoked. Please reload your browser window").build();}
         Guest guest = ApiHelper.getBuddyToAccess(guestService, coachee);
         if (guest==null)
@@ -173,13 +173,13 @@ public class ConnectorStore {
                 final Connector api = connectorInfo.getApi();
                 if (api==null) {
                     StringBuilder sb = new StringBuilder("module=API component=connectorStore action=getInstalledConnectors ");
-                    logger.warn("message=\"null connector for " + connectorInfo.getName() + "\"");
+                    sb.append("message=\"null connector for " + connectorInfo.getName() + "\"");
+                    logger.warn(sb);
                     continue;
                 }
                 if (!guestService.hasApiKey(guest.getId(), api)||api.getName().equals("facebook")/*HACK*/) {
                     connectors.remove(i--);
-                }
-                else {
+                } else {
                     ConnectorInfo connector = connectorInfo;
                     ConnectorModelFull connectorModel = new ConnectorModelFull();
                     Connector conn = Connector.fromValue(connector.api);
@@ -222,6 +222,27 @@ public class ConnectorStore {
                         connectorModel.uploadMessage = uploadMessage;
                     }
                     connectorsArray.add(connectorModel);
+                }
+            }
+            if (buddyToAccessParameter!=null) {
+                final List<SharedConnector> sharedConnectors = buddiesService.getSharedConnectors(AuthHelper.getGuestId(), coachee.guestId);
+                List<ConnectorModelFull> unshared = new ArrayList<ConnectorModelFull>();
+
+                eachTrustingBuddyConnector:for (int i=0; i<connectorsArray.size(); i++) {
+                    ConnectorModelFull fullModel = connectorsArray.get(i);
+                    for (SharedConnector sharedConnector : sharedConnectors) {
+                        if (sharedConnector.connectorName.equals(fullModel.connectorName))
+                            continue eachTrustingBuddyConnector;
+                    }
+                    unshared.add(fullModel);
+                }
+
+                for (ConnectorModelFull toRemove : unshared) {
+                    for (int i=0; i<connectorsArray.size(); i++) {
+                        ConnectorModelFull fullModel = connectorsArray.get(i);
+                        if (fullModel.apiKeyId==toRemove.apiKeyId)
+                            connectorsArray.remove(fullModel);
+                    }
                 }
             }
             StringBuilder sb = new StringBuilder("module=API component=connectorStore action=getInstalledConnectors")
@@ -462,14 +483,14 @@ public class ConnectorStore {
                             @QueryParam("start") long start,
                             @QueryParam("end") long end,
                             @QueryParam("value") String value,
-                            @ApiParam(value="Buddy to access username Header (" + CoachingService.BUDDY_TO_ACCESS_HEADER + ")", required=false) @HeaderParam(CoachingService.BUDDY_TO_ACCESS_HEADER) String coacheeUsernameHeader){
+                            @ApiParam(value="Buddy to access username parameter (" + BuddiesService.BUDDY_TO_ACCESS_PARAM + ")", required=false) @QueryParam(BuddiesService.BUDDY_TO_ACCESS_PARAM) String buddyToAccessParameter){
         Guest guest = AuthHelper.getGuest();
         if(guest==null)
             return Response.status(401).entity("You are no longer logged in").build();
 
         CoachingBuddy coachee;
         try {
-            coachee = AuthHelper.getCoachee(coacheeUsernameHeader, coachingService);
+            coachee = AuthHelper.getCoachee(buddyToAccessParameter, buddiesService);
         } catch (CoachRevokedException e) {
             return Response.status(403).entity("Sorry, permission to access this data has been revoked. Please reload your browser window").build();
         }

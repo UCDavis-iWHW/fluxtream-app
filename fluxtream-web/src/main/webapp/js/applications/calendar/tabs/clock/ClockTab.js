@@ -32,7 +32,7 @@ define(["applications/calendar/tabs/clock/ClockDrawingUtils",
 	function render(params) {
         setTabParam = params.setTabParam;
         setTabParam(null);
-        if (Calendar.digest.delta && params.facetToShow == null)
+        if (params.digest.delta && params.facetToShow == null)
             params.facetToShow = currentFacetTooltip;
         hideEventInfo();
         this.getTemplate("text!applications/calendar/tabs/clock/clock.html", "clock", function() {
@@ -222,7 +222,10 @@ define(["applications/calendar/tabs/clock/ClockDrawingUtils",
 		for (var i = 0; i < items.length; i++) {
 			try {
 				var item = items[i];
-                if (item.type==="google_calendar-entry"&&item.allDay)
+                // let's not draw allDay or empty events
+                if (!_.isUndefined(item["allDay"])&&item["allDay"])
+                    continue;
+                if (!_.isUndefined(item["isEmpty"])&&item["isEmpty"])
                     continue;
                 var color = getItemColor(item);
                 var strokeWidth = getStrokeWidth(item);

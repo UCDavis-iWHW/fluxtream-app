@@ -15,7 +15,7 @@ import org.fluxtream.core.domain.CoachingBuddy;
 import org.fluxtream.core.domain.Guest;
 import org.fluxtream.core.mvc.models.StatusModel;
 import org.fluxtream.core.mvc.models.guest.GuestModel;
-import org.fluxtream.core.services.CoachingService;
+import org.fluxtream.core.services.BuddiesService;
 import org.fluxtream.core.services.GuestService;
 import org.fluxtream.core.utils.HttpUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +36,7 @@ import static org.fluxtream.core.utils.Utils.hash;
 @Component("RESTLegacyGuestController")
 @Api(value = "/guest", description = "Retrieve guest information")
 @Scope("request")
+@Deprecated
 public class LegacyGuestController {
 
 	@Autowired
@@ -47,19 +48,20 @@ public class LegacyGuestController {
 	Configuration env;
 
     @Autowired
-    CoachingService coachingService;
+    BuddiesService buddiesService;
 
     @GET
 	@Path("/")
 	@Produces({ MediaType.APPLICATION_JSON })
-    @ApiOperation(value = "Retrieve information on the currently logged in's guest", response = StatusModel.class)
+    @ApiOperation(value = "Retrieve information on the currently logged in's guest", response = GuestModel.class)
+    @Deprecated
 	public Object getCurrentGuest() throws InstantiationException,
 			IllegalAccessException, ClassNotFoundException {
         try{
             long guestId = AuthHelper.getGuestId();
 
             Guest guest = guestService.getGuestById(guestId);
-            GuestModel guestModel = new GuestModel(guest);
+            GuestModel guestModel = new GuestModel(guest, false);
 
             return guestModel;
         }
@@ -72,6 +74,7 @@ public class LegacyGuestController {
     @Path("/avatarImage")
     @Produces({MediaType.APPLICATION_JSON})
     @ApiOperation(value = "Retrieve the avatar (gravatar) of the currently logged in's guest", response = String.class)
+    @Deprecated
     public String getAvatarImage() {
         Guest guest = AuthHelper.getGuest();
         JSONObject json = new JSONObject();
@@ -137,14 +140,15 @@ public class LegacyGuestController {
     @GET
     @Path("/coachees")
     @Produces({MediaType.APPLICATION_JSON})
-    @ApiOperation(value = "Retrieve the currently logged in guest's list of coachees", responseContainer = "array",
+    @ApiOperation(value = "Retrieve the currently logged in guest's list of coachees", responseContainer = "Array",
             response = GuestModel.class)
+    @Deprecated
     public List<GuestModel> getCoachees() {
         Guest guest = AuthHelper.getGuest();
-        final List<Guest> coachees = coachingService.getCoachees(guest.getId());
+        final List<Guest> coachees = buddiesService.getTrustedBuddies(guest.getId());
         final List<GuestModel> coacheeModels = new ArrayList<GuestModel>();
         for (Guest coachee : coachees)
-            coacheeModels.add(new GuestModel(coachee));
+            coacheeModels.add(new GuestModel(coachee, true));
         return coacheeModels;
     }
 

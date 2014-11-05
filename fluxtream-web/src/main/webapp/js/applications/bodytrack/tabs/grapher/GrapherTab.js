@@ -5,14 +5,18 @@ define(["core/Tab","core/grapher/Grapher","core/FlxState"], function(Tab,Grapher
     var lastGuestId;
 
     var grapher = null;
+    var grapherLoaded = false;
     var pointLoad = null;
     var currentPointLoad = null;
     var cursorPositionToSet = null;
     var channelsToAdd = [];
 
     grapherTab.render = function(params){
+        if (App.buddyToAccess == null)
+            return;
         if (lastGuestId!=null&&App.buddyToAccess.id!==lastGuestId) {
             $("._timeline_sources_list").empty();
+            $("._timeline_channel").remove();
             grapher.reload();
         }
         lastGuestId = App.buddyToAccess.id;
@@ -63,7 +67,7 @@ define(["core/Tab","core/grapher/Grapher","core/FlxState"], function(Tab,Grapher
         if (grapher == null)
             grapher = new Grapher($("#grapherContainer"),
                 {showFullControls: true, showDeleteBtn: true, onLoadActions: [onGrapherLoad], loadViewOverride: loadView});
-        else
+        else if (grapherLoaded)
             onGrapherLoad();
     }
 
@@ -79,6 +83,7 @@ define(["core/Tab","core/grapher/Grapher","core/FlxState"], function(Tab,Grapher
         }
         //trigger the resize handler for the grapher. This forces the grapher objects to resize to their proper sizes
         $(window).resize();
+        grapherLoaded = true;
     }
 
     function onSourceLoad(){

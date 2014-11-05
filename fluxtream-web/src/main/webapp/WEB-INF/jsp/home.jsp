@@ -1,8 +1,10 @@
 <%@ page pageEncoding="utf-8" contentType="text/html; charset=UTF-8"%><%@ taglib
 	uri="http://granule.com/tags" prefix="g"
-%><%@ page import="java.util.List"
+%><%@ page import="org.fluxtream.core.auth.AuthHelper"
 %><%@ page import="org.fluxtream.core.domain.Guest"
-%><%
+%>
+<%@ page import="java.util.List" %>
+<%
     Boolean tracker = (Boolean)request.getAttribute("tracker");
     Boolean intercom = (Boolean)request.getAttribute("intercom");
     Boolean useMinifiedJs = (Boolean)request.getAttribute("useMinifiedJs");
@@ -14,7 +16,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style"
 	content="black-translucent" />
-<meta name="viewport" content="width=1000, initial-scale=1.0">
+<meta name="viewport" content="width=device-width">
 <title>Fluxtream</title>
 <meta name="description" content="">
 <meta name="author" content="">
@@ -51,7 +53,7 @@
 		<div class="navbar">
 			<div class="navbar-inner">
 				<div class="container-fluid">
-					<a class="btn btn-navbar" data-toggle="collapse"
+					<a class="btn btn-navbar" data-toggle="collapse-custom"
 						data-target=".nav-collapse"> <span class="icon-bar"></span> <span
 						class="icon-bar"></span> <span class="icon-bar"></span>
 					</a>
@@ -92,9 +94,9 @@
 									<li id="coachingDivider" class="divider"></li><%
                                     if (coachees.size()>0) {
                                         for (Guest guest : coachees) {%>
-                                    <li><a onclick="if (typeof(ga)!='undefined') {ga('send', 'event', 'menuitem', 'click', 'viewBuddyData', 1);}" href="javascript:App.as('<%=guest.username%>')">View <%=guest.getGuestName()%>'s data</a></li>
+                                    <li><a onclick="if (typeof(ga)!='undefined') {ga('send', 'event', 'menuitem', 'click', 'viewBuddyData', 1);}" href="javascript:App.as('<%=guest.getId()%>')">View <%=guest.getGuestName()%>'s data</a></li>
                                         <%  } %>
-                                    <li><a onclick="if (typeof(ga)!='undefined') {ga('send', 'event', 'menuitem', 'click', 'viewMyData', 1);}" href="javascript:App.as('self')">View My data</a></li>
+                                    <li><a onclick="if (typeof(ga)!='undefined') {ga('send', 'event', 'menuitem', 'click', 'viewMyData', 1);}" href="javascript:App.as(<%=AuthHelper.getGuestId()%>)">View My data</a></li>
                                     <% } %>
                                     <li><a href="javascript:App.sharingDialog.show();if (typeof(ga)!='undefined') {ga('send', 'event', 'menuitem', 'click', 'sharingDialog', 1);}"><i class="mainmenu-icon icon-share icon-large pull-right"></i><span style="margin-right:2em">Share your data...</span></a></li>
                                     <li class="divider"></li>
@@ -151,6 +153,7 @@
     <script src="/static/js/moment-2.5.1.min.js"></script>
     <script src="/static/js/jquery.xcolor-1.8.js"></script>
     <script src="/static/js/jquery.outerHTML-1.0.0.js"></script>
+    <script src="/static/js/jquery.fastbutton-1.0.0.js"></script>
 
     <script>
         window.FLX_RELEASE_NUMBER = "${release}";

@@ -15,7 +15,7 @@ import org.fluxtream.core.domain.AbstractFacet;
 import org.fluxtream.core.domain.ApiKey;
 import org.fluxtream.core.domain.GuestSettings;
 import org.fluxtream.core.mvc.models.TimespanModel;
-import org.fluxtream.core.services.CoachingService;
+import org.fluxtream.core.services.BuddiesService;
 import org.fluxtream.core.services.SettingsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -32,7 +32,7 @@ public class GoogleCalendarBodytrackResponder extends AbstractBodytrackResponder
     SettingsService settingsService;
 
     @Autowired
-    CoachingService coachingService;
+    BuddiesService buddiesService;
 
     @Override
     public List<TimespanModel> getTimespans(final long startMillis, final long endMillis, final ApiKey apiKey, final String channelName) {
@@ -40,17 +40,17 @@ public class GoogleCalendarBodytrackResponder extends AbstractBodytrackResponder
         GoogleCalendarConnectorSettings connectorSettings = (GoogleCalendarConnectorSettings)settingsService.getConnectorSettings(apiKey.getId());
         final TimeInterval timeInterval = new SimpleTimeInterval(startMillis, endMillis, TimeUnit.ARBITRARY, TimeZone.getTimeZone("UTC"));
         String objectTypeName = apiKey.getConnector().getName() + "-event";
-        List<AbstractFacet> facets = getFacetsInTimespan(timeInterval,apiKey,null);
-        facets = coachingService.filterFacets(AuthHelper.getGuestId(), apiKey.getId(), facets);
+        List<AbstractFacet> facets = getFacetsInTimespanOrderedByEnd(timeInterval,apiKey,null);
+        facets = buddiesService.filterFacets(AuthHelper.getGuestId(), apiKey.getId(), facets);
 
         for (AbstractFacet facet : facets){
             GoogleCalendarEventFacet event = (GoogleCalendarEventFacet) facet;
             if (connectorSettings!=null) {
                 final CalendarConfig calendarConfig = connectorSettings.getCalendar(event.calendarId);
                 if (calendarConfig!=null&&!calendarConfig.hidden)
-                    items.add(new TimespanModel(event.start, event.end, ((GoogleCalendarEventFacet)facet).calendarId, objectTypeName));
+                    simpleMergeAddTimespan(items,new TimespanModel(event.start, event.end, ((GoogleCalendarEventFacet)facet).calendarId, objectTypeName),startMillis,endMillis);
             } else
-                items.add(new TimespanModel(event.start, event.end, ((GoogleCalendarEventFacet)facet).calendarId, objectTypeName));
+                simpleMergeAddTimespan(items,new TimespanModel(event.start, event.end, ((GoogleCalendarEventFacet)facet).calendarId, objectTypeName),startMillis,endMillis);
         }
         return items;
     }

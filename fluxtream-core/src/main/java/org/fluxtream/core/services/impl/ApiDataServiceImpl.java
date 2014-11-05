@@ -1,20 +1,8 @@
 package org.fluxtream.core.services.impl;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TimeZone;
-import java.util.concurrent.ConcurrentHashMap;
-import javax.persistence.Entity;
-import javax.persistence.EntityManager;
-import javax.persistence.NonUniqueResultException;
-import javax.persistence.PersistenceContext;
-import javax.persistence.Query;
-import javax.persistence.TypedQuery;
-import javax.sql.DataSource;
+import net.sf.json.JSONObject;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.fluxtream.core.ApiData;
 import org.fluxtream.core.Configuration;
 import org.fluxtream.core.TimeInterval;
@@ -25,40 +13,34 @@ import org.fluxtream.core.connectors.dao.FacetDao;
 import org.fluxtream.core.connectors.location.LocationFacet;
 import org.fluxtream.core.connectors.updaters.UpdateInfo;
 import org.fluxtream.core.connectors.vos.AbstractFacetVO;
-import org.fluxtream.core.domain.AbstractFacet;
-import org.fluxtream.core.domain.AbstractRepeatableFacet;
-import org.fluxtream.core.domain.AbstractUserProfile;
-import org.fluxtream.core.domain.ApiKey;
-import org.fluxtream.core.domain.GuestSettings;
-import org.fluxtream.core.domain.Tag;
-import org.fluxtream.core.domain.TagFilter;
+import org.fluxtream.core.domain.*;
 import org.fluxtream.core.events.DataReceivedEvent;
 import org.fluxtream.core.facets.extractors.AbstractFacetExtractor;
 import org.fluxtream.core.metadata.DayMetadata;
-import org.fluxtream.core.services.ApiDataService;
-import org.fluxtream.core.services.BodyTrackStorageService;
-import org.fluxtream.core.services.EventListenerService;
-import org.fluxtream.core.services.GuestService;
-import org.fluxtream.core.services.MetadataService;
-import org.fluxtream.core.services.SettingsService;
+import org.fluxtream.core.services.*;
 import org.fluxtream.core.utils.JPAUtils;
 import org.fluxtream.core.utils.TimeUtils;
-import net.sf.json.JSONObject;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.exception.ExceptionUtils;
 import org.jetbrains.annotations.Nullable;
+import org.joda.time.DateTimeUtils;
 import org.joda.time.DateTimeZone;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.config.BeanDefinition;
-import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
-import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import javax.persistence.*;
+import javax.sql.DataSource;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Component
@@ -343,6 +325,15 @@ public class ApiDataServiceImpl implements ApiDataService, DisposableBean {
     }
 
     @Override
+    public List<AbstractFacet> getApiDataFacets(ApiKey apiKey,
+                                                ObjectType objectType,
+                                                TimeInterval timeInterval,
+                                                @Nullable TagFilter tagFilter,
+                                                @Nullable String orderByString) {
+        return jpaDao.getFacetsBetween(apiKey,objectType,timeInterval,tagFilter,orderByString);
+    }
+
+    @Override
     public AbstractFacet getOldestApiDataFacet(ApiKey apiKey, ObjectType objectType){
         return jpaDao.getOldestFacet(apiKey, objectType);
     }
@@ -448,6 +439,7 @@ public class ApiDataServiceImpl implements ApiDataService, DisposableBean {
                 persistTags(facet);
             }
             try {
+                facet.timeUpdated = DateTimeUtils.currentTimeMillis();
                 em.persist(facet);
                 StringBuilder sb = new StringBuilder("module=updateQueue component=apiDataServiceImpl action=persistFacet")
                         .append(" connector=").append(Connector.fromValue(facet.api).getName())
@@ -741,53 +733,6 @@ public class ApiDataServiceImpl implements ApiDataService, DisposableBean {
     public void deleteStaleData() throws ClassNotFoundException {
         StaleDataCleanupWorker worker = beanFactory.getBean(StaleDataCleanupWorker.class);
         executor.execute(worker);
-    }
-
-    @Override
-    @Transactional(readOnly = false)
-    public void cleanupStaleData() throws Exception {
-        ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(
-                false);
-        scanner.addIncludeFilter(new AnnotationTypeFilter(Entity.class));
-        Set<BeanDefinition> components = scanner.findCandidateComponents("org.fluxtream");
-        for (BeanDefinition component : components)
-        {
-            Class cls = Class.forName(component.getBeanClassName());
-            final String entityName = JPAUtils.getEntityName(cls);
-            System.out.println("cleaning up " + entityName + "...");
-            if (entityName.startsWith("Facet_")) {
-                if (!JPAUtils.hasRelation(cls)) {
-                    // Clean up entries for apiKeyId's which are no longer present in the system, but preserve items with
-                    // api=0 to preserve the locations generated from reverse IP lookup when the users log in.
-                    Query query = em
-                            .createNativeQuery("DELETE FROM " + entityName + " WHERE (apiKeyId NOT IN (SELECT DISTINCT id from ApiKey)) AND api!=0;");
-                    final int i = query.executeUpdate();
-                    StringBuilder sb = new StringBuilder("module=updateQueue component=apiDataServiceImpl action=deleteStaleData")
-                            .append(" facetTable=").append(entityName).append(" facetsDeleted=").append(i);
-                    logger.info(sb.toString());
-                } else {
-                    Query query = em
-                            .createNativeQuery("SELECT * FROM " + entityName + " WHERE (apiKeyId NOT IN (SELECT DISTINCT id from ApiKey)) AND api!=0;", cls);
-                    final List<?extends AbstractFacet> facetsToDelete = query.getResultList();
-                    final int i = facetsToDelete.size();
-                    if (i>0) {
-                        for (AbstractFacet facet : facetsToDelete) {
-                            em.remove(facet);
-                        }
-                        StringBuilder sb = new StringBuilder("module=updateQueue component=apiDataServiceImpl action=deleteStaleData")
-                                .append(" facetTable=").append(entityName).append(" facetsDeleted=").append(i);
-                        logger.info(sb.toString());
-                    }
-                }
-                em.flush();
-            }
-        }
-        Query query = em
-                .createNativeQuery("DELETE FROM ApiUpdates WHERE apiKeyId NOT IN (SELECT DISTINCT id from ApiKey);");
-        final int i = query.executeUpdate();
-        StringBuilder sb = new StringBuilder("module=updateQueue component=apiDataServiceImpl action=deleteStaleData")
-                .append(" facetTable=ApiUpdates").append(" facetsDeleted=").append(i);
-        logger.info(sb.toString());
     }
 
     @Override

@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.persistence.EntityManager;
+import javax.persistence.LockModeType;
 import javax.persistence.PersistenceContext;
 import javax.persistence.TypedQuery;
 import javax.persistence.criteria.CriteriaBuilder;
@@ -211,7 +212,7 @@ public class GuestServiceImpl implements GuestService, DisposableBean {
 	@Transactional(readOnly = false)
 	public ApiKey setApiKeyAttribute(ApiKey ak, String key,
 			String value) {
-        ApiKey apiKey = em.find(ApiKey.class, ak.getId());
+        ApiKey apiKey = em.find(ApiKey.class, ak.getId(), LockModeType.PESSIMISTIC_WRITE);
 
         // apiKey could be null, for example if the connector
         // was already deleted.  In this case just return
@@ -219,7 +220,6 @@ public class GuestServiceImpl implements GuestService, DisposableBean {
         if(apiKey==null) {
             return null;
         }
-
         // At this point we know that apiKey exists and
         // is non-null
         apiKey.removeAttribute(key);
@@ -327,12 +327,20 @@ public class GuestServiceImpl implements GuestService, DisposableBean {
 
     @Override
     @Transactional(readOnly=false)
-    public void setApiKeyStatus(final long apiKeyId, final ApiKey.Status status, final String stackTrace) {
+    public void setApiKeyStatus(final long apiKeyId, final ApiKey.Status status, final String stackTrace,
+                                final String reason) {
         final ApiKey apiKey = getApiKey(apiKeyId);
         if (apiKey!=null) {
             apiKey.status = status;
-            if (stackTrace!=null)
-                apiKey.stackTrace = stackTrace;
+            if (status== ApiKey.Status.STATUS_UP) {
+                apiKey.stackTrace = null;
+                apiKey.reason = null;
+            } else {
+                if (stackTrace != null)
+                    apiKey.stackTrace = stackTrace;
+                if (reason != null)
+                    apiKey.reason = reason;
+            }
             em.persist(apiKey);
         }
     }
@@ -376,54 +384,35 @@ public class GuestServiceImpl implements GuestService, DisposableBean {
         }
         JPAUtils.execute(em, "updateWorkerTasks.delete.all", guest.getId());
         em.remove(guest);
-        em.flush();
         List<ApiKey> apiKeys = getApiKeys(guest.getId());
         for (ApiKey key : apiKeys) {
             if(key!=null && key.getConnector()!=null) {
                 apiDataService.eraseApiData(key);
-                em.flush();
             }
         }
-        em.flush();
         for (ApiKey apiKey : apiKeys) {
             if(apiKey!=null){
                 em.remove(apiKey);
-                em.flush();
             }
         }
-        em.flush();
         JPAUtils.execute(em, "addresses.delete.all", guest.getId());
-        em.flush();
         JPAUtils.execute(em, "notifications.delete.all", guest.getId());
-        em.flush();
         JPAUtils.execute(em, "settings.delete.all", guest.getId());
-        em.flush();
         JPAUtils.execute(em, "location.delete.all", guest.getId());
-        em.flush();
         JPAUtils.execute(em, "visitedCities.delete.all", guest.getId());
-        em.flush();
         JPAUtils.execute(em, "updateWorkerTasks.delete.all", guest.getId());
-        em.flush();
         JPAUtils.execute(em, "tags.delete.all", guest.getId());
-        em.flush();
         JPAUtils.execute(em, "notifications.delete.all", guest.getId());
-        em.flush();
         final List<CoachingBuddy> coachingBuddies = JPAUtils.find(em, CoachingBuddy.class, "coachingBuddies.byGuestId", guest.getId());
         for (CoachingBuddy coachingBuddy : coachingBuddies)
             em.remove(coachingBuddy);
-        em.flush();
         JPAUtils.execute(em, "channelMapping.delete.all", guest.getId());
-        em.flush();
         JPAUtils.execute(em, "connectorFilterState.delete.all", guest.getId());
-        em.flush();
         JPAUtils.execute(em, "channelStyle.delete.all", guest.getId());
-        em.flush();
         JPAUtils.execute(em, "grapherView.delete.all", guest.getId());
-        em.flush();
         JPAUtils.execute(em, "widgetSettings.delete.all", guest.getId());
-        em.flush();
         JPAUtils.execute(em, "dashboards.delete.all", guest.getId());
-        em.flush();
+        JPAUtils.execute(em, "fitbitUser.delete", guest.getId());
     }
 
     private void revokeFacebookPermissions(final Guest guest) {

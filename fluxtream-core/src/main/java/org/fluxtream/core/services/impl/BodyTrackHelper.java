@@ -1,52 +1,30 @@
 package org.fluxtream.core.services.impl;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.SortedSet;
-import java.util.TreeSet;
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
-import javax.persistence.Query;
+import com.google.gson.*;
+import com.wordnik.swagger.annotations.ApiModel;
+import com.wordnik.swagger.annotations.ApiModelProperty;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.fluxtream.core.Configuration;
 import org.fluxtream.core.TimeInterval;
 import org.fluxtream.core.aspects.FlxLogger;
+import org.fluxtream.core.auth.AuthHelper;
 import org.fluxtream.core.connectors.Connector;
 import org.fluxtream.core.connectors.bodytrackResponders.AbstractBodytrackResponder;
-import org.fluxtream.core.domain.ApiKey;
-import org.fluxtream.core.domain.ChannelMapping;
-import org.fluxtream.core.domain.CoachingBuddy;
-import org.fluxtream.core.domain.GrapherView;
-import org.fluxtream.core.domain.Tag;
-import org.fluxtream.core.services.ApiDataService;
-import org.fluxtream.core.services.DataUpdateService;
-import org.fluxtream.core.services.GuestService;
-import org.fluxtream.core.services.PhotoService;
+import org.fluxtream.core.domain.*;
+import org.fluxtream.core.services.*;
 import org.fluxtream.core.utils.JPAUtils;
 import org.fluxtream.core.utils.Utils;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
-import org.apache.commons.lang.exception.ExceptionUtils;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
+import java.io.*;
+import java.lang.reflect.Type;
+import java.util.*;
 
 //import java.nio.file.Path;
 //import java.nio.file.Paths;
@@ -93,6 +71,9 @@ public class BodyTrackHelper {
 
     @Autowired
     ApiDataService apiDataService;
+
+    @Autowired
+    BuddiesService buddiesService;
 
     @Autowired
     BeanFactory beanFactory;
@@ -376,6 +357,33 @@ public class BodyTrackHelper {
             // create the respone
             response = new SourcesResponse(infoResponse, guestId, coachee);
 
+            // filter out photo connectors that aren't shared with this user
+            if (coachee!=null) {
+                List<String> sourcesToRemove = new ArrayList<String>();
+                for (Source source : response.sources) {
+                    final Connector photoConnectorForSource = Connector.fromDeviceNickname(source.name);
+                    if (photoConnectorForSource!=null) {
+                        final List<ApiKey> apiKeys = guestService.getApiKeys(coachee.guestId, photoConnectorForSource);
+                        for (ApiKey apiKey : apiKeys) {
+                            if (buddiesService.getSharedConnector(apiKey.getId(), AuthHelper.getGuestId())==null) {
+                                sourcesToRemove.add(source.name);
+                                break;
+                            }
+                        }
+                      // 09/15/2014 on Anne's request: until we have thoroughly fixed the management
+                      // of channel mappings, sources that don't map to connectors need to continue being
+                      // shared with buddies
+//                    } else {
+//                        // let's be conservative: if we don't know this connector, let's assume
+//                        // it wasn't shared
+//                        sourcesToRemove.add(source.name);
+                    }
+                }
+                for (String sourceName : sourcesToRemove) {
+                    response.deleteSource(sourceName);
+                }
+            }
+
             //TODO: this is a hack to prevent double flickr photo channel showing up
             response.deleteSource("Flickr");
             response.deleteSource("SMS_Backup");
@@ -387,6 +395,9 @@ public class BodyTrackHelper {
                 // doesn't yet support a connector that is supported on another branch and resulted
                 // in data being populated in the database which is going to cause a crash here
                 if (api.getConnector()==null)
+                    continue;
+                // filter out not shared connectors
+                if (coachee!=null&& buddiesService.getSharedConnector(api.getId(), AuthHelper.getGuestId())==null)
                     continue;
                 Source source = response.hasSource(mapping.deviceName);
                 if (source == null){
@@ -713,8 +724,10 @@ public class BodyTrackHelper {
         private final SortedSet<String> tags = new TreeSet<String>();
     }
 
-    private static class ViewsList{
-        LinkedList<ViewStub> views = new LinkedList<ViewStub>();
+    @ApiModel
+    public static class ViewsList{
+        @ApiModelProperty
+        public LinkedList<ViewStub> views = new LinkedList<ViewStub>();
 
         void populateViews(EntityManager em, Gson gson, long guestId){
             List<GrapherView> viewList = JPAUtils.find(em, GrapherView.class,"grapherView",guestId);
@@ -725,14 +738,19 @@ public class BodyTrackHelper {
     }
 
     public static class AddViewResult extends ViewsList{
-        long saved_view_id;
+        public long saved_view_id;
     }
 
-    private static class ViewStub{
-        long id;
-        long last_used;
-        String name;
-        AxisRange time_range;
+    @ApiModel
+    public static class ViewStub{
+        @ApiModelProperty
+        public long id;
+        @ApiModelProperty
+        public long last_used;
+        @ApiModelProperty
+        public String name;
+        @ApiModelProperty
+        public AxisRange time_range;
 
         public ViewStub(GrapherView view,Gson gson){
             id = view.getId();
@@ -746,20 +764,20 @@ public class BodyTrackHelper {
 
     }
 
-    private static class ViewJSON{
-        String name;
-        ViewData v2;
+    public static class ViewJSON{
+        public String name;
+        public ViewData v2;
     }
 
-    private static class ViewData{
-        AxisRange x_axis;
-        boolean show_add_pane;
-        ArrayList<ViewChannelData> y_axes;
+    public static class ViewData{
+        public AxisRange x_axis;
+        public boolean show_add_pane;
+        public ArrayList<ViewChannelData> y_axes;
     }
 
-    private static class AxisRange{
-        double min;
-        double max;
+    public static class AxisRange{
+        public double min;
+        public double max;
     }
 
     public static class GetTileResponse{
@@ -831,8 +849,10 @@ public class BodyTrackHelper {
         }
     }
 
+    @ApiModel
     public class SourcesResponse {
-        public ArrayList<Source> sources;
+        @ApiModelProperty
+        public List<Source> sources;
 
         public SourcesResponse(ChannelInfoResponse infoResponse, Long guestId, CoachingBuddy coachee){
             sources = new ArrayList<Source>();
@@ -902,7 +922,10 @@ public class BodyTrackHelper {
         }
     }
 
+    @ApiModel
     public static class SourceInfo{
+
+        @ApiModelProperty
         public Source info;
 
         public SourceInfo(ChannelInfoResponse infoResponse, String deviceName){
@@ -937,23 +960,39 @@ public class BodyTrackHelper {
 
     }
 
+    @ApiModel
     public static class Source{
+        @ApiModelProperty
         public String name;
-        public ArrayList<Channel> channels;
+        @ApiModelProperty
+        public List<Channel> channels;
+        @ApiModelProperty
         public Double min_time = 0.0;
+        @ApiModelProperty
         public Double max_time = 0.0;
     }
 
+    @ApiModel
     public static class Channel{
+        @ApiModelProperty
         public String type;
+        @ApiModelProperty
         public ChannelStyle builtin_default_style;
+        @ApiModelProperty
         public ChannelStyle style;
+        @ApiModelProperty
         public double max;
+        @ApiModelProperty
         public double min;
+        @ApiModelProperty
         public Double min_time;
+        @ApiModelProperty
         public Double max_time;
+        @ApiModelProperty
         public String name;
+        @ApiModelProperty
         public String objectTypeName;
+        @ApiModelProperty
         public String time_type;
 
         public Channel(){
@@ -986,10 +1025,15 @@ public class BodyTrackHelper {
     }
 
 
+    @ApiModel
     public static class ChannelStyle{
+        @ApiModelProperty
         public HighlightStyling highlight;
+        @ApiModelProperty
         public CommentStyling comments;
-        public ArrayList<Style> styles;
+        @ApiModelProperty
+        public List<Style> styles;
+        @ApiModelProperty
         public MainTimespanStyle timespanStyles;
 
         public static ChannelStyle getDefaultChannelStyle(String name){
