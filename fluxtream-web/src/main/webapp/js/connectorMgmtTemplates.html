@@ -216,7 +216,7 @@
                     <div class="row-fluid">
                         {{#connectors}}
                         <div class="span4">
-                            <a  href="javascript:App.addConnector('{{connectUrl}}')">
+                            <a href="javascript:App.addConnector('{{connectUrl}}')" id="add-{{connectorName}}">
                                 <img src="{{image}}" alt="" width=158 Height=89>
                             </a>
                             <p>{{{text}}}</p>
@@ -322,7 +322,7 @@
     </div>
 </template>
 <template id="channel-settings">
-    <form class="form-inline">
+    <form class="form-inline" action="javascript:void(0);">
       <button class="selectAll btn">Select All</button>&nbsp;<button class="selectNone btn">Select None</button>
         <table class="table flx-channel-table">
             <thead>
@@ -334,7 +334,7 @@
             <tbody>
             {{#channelNames}}
             <tr>
-                <td><input type="checkbox" id="{{name}}-checkbox"></td>
+                <td><input type="checkbox" id="{{name}}-checkbox" data-channelName="{{name}}"></td>
                 <td class="flx-channel-name"><label for="1">{{displayName}}</label></td>
             </tr>
             {{/channelNames}}

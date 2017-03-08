@@ -46,9 +46,10 @@ import org.springframework.stereotype.Component;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.*;
 import javax.ws.rs.core.*;
-import java.lang.reflect.Type;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Path("/bodytrack")
 @Component("RESTLegacyBodytrackController")
@@ -95,6 +96,8 @@ public class LegacyBodyTrackController {
     @Autowired
     BeanFactory beanFactory;
 
+    Pattern alphanumeric_dots_and_underscore = Pattern.compile("[0-9a-zA-Z_\\.]+");
+
     @GET
     @Path("/exportCSV/{UID}/fluxtream-export-from-{start}-to-{end}.csv")
     @ApiOperation(value = "CSV export <startTime -> endTime", response = String.class)
@@ -107,9 +110,9 @@ public class LegacyBodyTrackController {
         try{
             long loggedInUserId = AuthHelper.getGuestId();
             boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
+            TrustedBuddy trustedBuddy = buddiesService.getTrustedBuddy(loggedInUserId, uid);
 
-            if (!accessAllowed && coachee==null) {
+            if (!accessAllowed && trustedBuddy ==null) {
                 uid = null;
             }
 
@@ -226,10 +229,15 @@ public class LegacyBodyTrackController {
                                     @ApiParam(value="JSON encoded array of channels being uploaded for", required=true) @FormParam("channel_names") String channels,
                                     @ApiParam(value="Multipart form data to be uploaded", required=true)  @FormParam("data") String data){
         StatusModel status;
+        final List<String> channelNames = gson.fromJson(channels, new TypeToken<Collection<String>>(){}.getType());
+        String illegalName = checkDeviceAndChannelNamesAreAlphanumericAndUnderscore(deviceNickname, channelNames);
+        if (illegalName!=null) {
+            status = new StatusModel(false, String.format("Illegal device nickname or channel name: %s; only alphanumeric and underscore are allowed", illegalName));
+            return gson.toJson(status);
+        }
+
         try{
             long guestId = AuthHelper.getGuestId();
-            Type channelsType =  new TypeToken<Collection<String>>(){}.getType();
-
             List<List<Object>> parsedData = new ArrayList<List<Object>>();
 
             //Gson doesn't seem to be able to handle arrays with mixed types nicely
@@ -258,15 +266,15 @@ public class LegacyBodyTrackController {
                 }
             }
 
-            final BodyTrackHelper.BodyTrackUploadResult uploadResult = bodyTrackHelper.uploadToBodyTrack(guestId, deviceNickname, (Collection<String>)gson.fromJson(channels, channelsType), parsedData);
+            ApiKey fluxtreamCaptureApiKey = ensureFluxtreamCaptureApiKey(guestId);
+            final BodyTrackHelper.BodyTrackUploadResult uploadResult = bodyTrackHelper.uploadToBodyTrack(fluxtreamCaptureApiKey, deviceNickname, channelNames, parsedData);
             if (uploadResult instanceof BodyTrackHelper.ParsedBodyTrackUploadResult){
                 BodyTrackHelper.ParsedBodyTrackUploadResult parsedResult = (BodyTrackHelper.ParsedBodyTrackUploadResult) uploadResult;
-                List<ApiKey> keys = guestService.getApiKeys(guestId,Connector.getConnector("fluxtream_capture"));
-                long apiKeyId = -1;
-                if (keys.size() > 0){
-                    apiKeyId = keys.get(0).getId();
-                }
-                dataUpdateService.logBodyTrackDataUpdate(guestId,apiKeyId,null,parsedResult);
+                bodytrackStorageService.ensureDataChannelMappingsExist(fluxtreamCaptureApiKey, channelNames, deviceNickname);
+                dataUpdateService.logBodyTrackDataUpdate(guestId,fluxtreamCaptureApiKey.getId(),null,parsedResult);
+            } else {
+                // what else can it be, really ?
+                LOG.warn("Unexpected upload result type : " + uploadResult.getClass().getName() );
             }
             status = createStatusModelFromBodyTrackUploadResult(uploadResult);
         }
@@ -274,6 +282,24 @@ public class LegacyBodyTrackController {
             status = new StatusModel(false,"Upload failed!");
         }
         return gson.toJson(status);
+    }
+
+    String checkDeviceAndChannelNamesAreAlphanumericAndUnderscore(String deviceNickname, List<String> channelNames) {
+        Matcher matcher = alphanumeric_dots_and_underscore.matcher(deviceNickname);
+        if (!matcher.matches()) return deviceNickname;
+        for (String channelName : channelNames) {
+            if (!alphanumeric_dots_and_underscore.matcher(channelName).matches())
+                return channelName;
+        }
+        return null;
+    }
+
+    private ApiKey ensureFluxtreamCaptureApiKey(long guestId) {
+        final Connector fluxtreamCapture = Connector.getConnector("fluxtream_capture");
+        ApiKey apiKey = guestService.getApiKey(guestId, fluxtreamCapture);
+        if (apiKey==null)
+            apiKey = guestService.createApiKey(guestId, fluxtreamCapture);
+        return apiKey;
     }
 
     @POST
@@ -501,9 +527,9 @@ public class LegacyBodyTrackController {
             loggedInUserId = AuthHelper.getGuestId();
             accessAllowed = checkForPermissionAccess(uid);
             if (!accessAllowed) {
-                final CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
-                if (coachee != null) {
-                    accessAllowed = coachee.hasAccessToConnector("fluxtream_capture");
+                final TrustedBuddy trustedBuddy = buddiesService.getTrustedBuddy(loggedInUserId, uid);
+                if (trustedBuddy != null) {
+                    accessAllowed = trustedBuddy.hasAccessToConnector("fluxtream_capture");
                 }
             }
         }
@@ -584,8 +610,8 @@ public class LegacyBodyTrackController {
         try{
             long loggedInUserId = AuthHelper.getGuestId();
             boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
-            if (!accessAllowed&&coachee==null){
+            TrustedBuddy trustedBuddy = buddiesService.getTrustedBuddy(loggedInUserId, uid);
+            if (!accessAllowed&& trustedBuddy ==null){
                 uid = null;
             }
             return bodyTrackHelper.fetchTile(uid, deviceNickname, channelName, level, offset);
@@ -603,8 +629,8 @@ public class LegacyBodyTrackController {
         try{
             long loggedInUserId = AuthHelper.getGuestId();
             boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
-            if (!accessAllowed&&coachee==null){
+            TrustedBuddy trustedBuddy = buddiesService.getTrustedBuddy(loggedInUserId, uid);
+            if (!accessAllowed&& trustedBuddy ==null){
                 uid = null;
             }
             return bodyTrackHelper.listViews(uid);
@@ -624,9 +650,9 @@ public class LegacyBodyTrackController {
         try{
             long loggedInUserId = AuthHelper.getGuestId();
             boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
+            TrustedBuddy trustedBuddy = buddiesService.getTrustedBuddy(loggedInUserId, uid);
 
-            if (!accessAllowed && coachee==null) {
+            if (!accessAllowed && trustedBuddy ==null) {
                 uid = null;
             }
             String result = bodyTrackHelper.getView(uid,id);
@@ -648,9 +674,9 @@ public class LegacyBodyTrackController {
         try{
             long loggedInUserId = AuthHelper.getGuestId();
             boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
+            TrustedBuddy trustedBuddy = buddiesService.getTrustedBuddy(loggedInUserId, uid);
 
-            if (!accessAllowed && coachee==null) {
+            if (!accessAllowed && trustedBuddy ==null) {
                 uid = null;
             }
             return bodyTrackHelper.saveView(uid, name, data);
@@ -669,15 +695,15 @@ public class LegacyBodyTrackController {
         try{
             final long loggedInUserId = AuthHelper.getGuestId();
             boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = null;
+            TrustedBuddy trustedBuddy = null;
             if (!accessAllowed) {
-                coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
-                accessAllowed = (coachee!=null);
+                trustedBuddy = buddiesService.getTrustedBuddy(loggedInUserId, uid);
+                accessAllowed = (trustedBuddy !=null);
             }
             if (!accessAllowed){
                 uid = null;
             }
-            return bodyTrackHelper.listSources(uid, coachee);
+            return bodyTrackHelper.listSources(uid, trustedBuddy);
         }
         catch (Exception e){
             return gson.toJson(new StatusModel(false,"Access Denied"));
@@ -694,9 +720,9 @@ public class LegacyBodyTrackController {
         try{
             long loggedInUserId = AuthHelper.getGuestId();
             boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
+            TrustedBuddy trustedBuddy = buddiesService.getTrustedBuddy(loggedInUserId, uid);
 
-            if (!accessAllowed && coachee==null) {
+            if (!accessAllowed && trustedBuddy ==null) {
                 uid = null;
             }
             return bodyTrackHelper.getSourceInfo(uid, name);
@@ -715,8 +741,8 @@ public class LegacyBodyTrackController {
         try {
             long loggedInUserId = AuthHelper.getGuestId();
             boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
-            if (!accessAllowed && coachee == null) {
+            TrustedBuddy trustedBuddy = buddiesService.getTrustedBuddy(loggedInUserId, uid);
+            if (!accessAllowed && trustedBuddy == null) {
                 uid = null;
             }
             return bodyTrackHelper.getAllTagsForUser(uid);
@@ -760,9 +786,9 @@ public class LegacyBodyTrackController {
         try{
             long loggedInUserId = AuthHelper.getGuestId();
             boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
+            TrustedBuddy trustedBuddy = buddiesService.getTrustedBuddy(loggedInUserId, uid);
 
-            if (!accessAllowed && coachee==null) {
+            if (!accessAllowed && trustedBuddy ==null) {
                 uid = null;
             }
 
@@ -829,11 +855,11 @@ public class LegacyBodyTrackController {
         try {
             long loggedInUserId = AuthHelper.getGuestId();
             boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
+            TrustedBuddy trustedBuddy = buddiesService.getTrustedBuddy(loggedInUserId, uid);
 
             final TagFilter.FilteringStrategy tagFilteringStrategy = TagFilter.FilteringStrategy.findByName(tagMatchingStrategyName);
 
-            if (!accessAllowed && coachee==null) {
+            if (!accessAllowed && trustedBuddy ==null) {
                 uid = null;
             }
 
@@ -910,11 +936,11 @@ public class LegacyBodyTrackController {
         try {
             long loggedInUserId = AuthHelper.getGuestId();
             boolean accessAllowed = checkForPermissionAccess(uid);
-            CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
+            TrustedBuddy trustedBuddy = buddiesService.getTrustedBuddy(loggedInUserId, uid);
 
             final TagFilter.FilteringStrategy tagFilteringStrategy = TagFilter.FilteringStrategy.findByName(tagMatchingStrategyName);
 
-            if (!accessAllowed && coachee==null) {
+            if (!accessAllowed && trustedBuddy ==null) {
                 return gson.toJson(new StatusModel(false, "Invalid User ID (null)"));
              }
 
@@ -1024,9 +1050,9 @@ public class LegacyBodyTrackController {
                     loggedInUserId = AuthHelper.getGuestId();
                     accessAllowed = checkForPermissionAccess(uid);
                     if (!accessAllowed) {
-                        final CoachingBuddy coachee = buddiesService.getTrustingBuddy(loggedInUserId, uid);
-                        if (coachee != null) {
-                            accessAllowed = coachee.hasAccessToConnector(connector.getName());
+                        final TrustedBuddy trustedBuddy = buddiesService.getTrustedBuddy(loggedInUserId, uid);
+                        if (trustedBuddy != null) {
+                            accessAllowed = trustedBuddy.hasAccessToConnector(connector.getName());
                         }
                     }
                 }

@@ -1,9 +1,5 @@
 package org.fluxtream.connectors.runkeeper;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.TimeZone;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.apache.log4j.Logger;
@@ -15,7 +11,6 @@ import org.fluxtream.core.connectors.updaters.AbstractUpdater;
 import org.fluxtream.core.connectors.updaters.AuthRevokedException;
 import org.fluxtream.core.connectors.updaters.UpdateFailedException;
 import org.fluxtream.core.connectors.updaters.UpdateInfo;
-import org.fluxtream.core.domain.AbstractFacet;
 import org.fluxtream.core.domain.ApiKey;
 import org.fluxtream.core.services.ApiDataService;
 import org.fluxtream.core.services.JPADaoService;
@@ -35,13 +30,15 @@ import org.scribe.oauth.OAuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.*;
+
 /**
  *
  * @author Candide Kemmler (candide@fluxtream.com)
  */
 @Component
 @Updater(prettyName = "RunKeeper", value = 35, updateStrategyType = Connector.UpdateStrategyType.INCREMENTAL,
-         objectTypes = {LocationFacet.class, RunKeeperFitnessActivityFacet.class}, defaultChannels = {"runkeeper.totalCalories"})
+         objectTypes = {LocationFacet.class, RunKeeperFitnessActivityFacet.class}, defaultChannels = {"RunKeeper.totalCalories"})
 public class RunKeeperUpdater  extends AbstractUpdater {
 
     Logger logger = Logger.getLogger(RunKeeperUpdater.class);
@@ -96,15 +93,18 @@ public class RunKeeperUpdater  extends AbstractUpdater {
         updateData(updateInfo, lastUpdated);
     }
 
-    private void updateData(final UpdateInfo updateInfo, final long since) throws Exception {
-        // Set the channel defaults for the Runkeeper datastore channels.  It is a bit of a hack
-        // to do this here, but it's convenient to do so since we know that this function is
-        // going to be run for both existing and new connectors.  Set most of the channels to
-        // default to show as bars rather than lines
-        bodytrackHelper.setBuiltinDefaultStyle(updateInfo.getGuestId(), "runkeeper", "minutesPerKilometer", barsStyle);
-        bodytrackHelper.setBuiltinDefaultStyle(updateInfo.getGuestId(), "runkeeper", "minutesPerMile", barsStyle);
-        bodytrackHelper.setBuiltinDefaultStyle(updateInfo.getGuestId(), "runkeeper", "totalCalories", barsStyle);
 
+    @Override
+    public void setDefaultChannelStyles(ApiKey apiKey) {
+        // Set the channel defaults for the Runkeeper datastore channels. Set most of the channels to
+        // default to show as bars rather than lines
+        bodytrackHelper.setBuiltinDefaultStyle(apiKey.getGuestId(), apiKey.getConnector().getName(), "minutesPerKilometer", barsStyle);
+        bodytrackHelper.setBuiltinDefaultStyle(apiKey.getGuestId(), apiKey.getConnector().getName(), "minutesPerMile", barsStyle);
+        bodytrackHelper.setBuiltinDefaultStyle(apiKey.getGuestId(), apiKey.getConnector().getName(), "totalCalories", barsStyle);
+    }
+
+
+    private void updateData(final UpdateInfo updateInfo, final long since) throws Exception {
         String url = DEFAULT_ENDPOINT+"/user?oauth_token=";
         final String accessToken = guestService.getApiKeyAttribute(updateInfo.apiKey, "accessToken");
         final Token token = new Token(accessToken, guestService.getApiKeyAttribute(updateInfo.apiKey, "runkeeperConsumerSecret"));
@@ -301,9 +301,7 @@ public class RunKeeperUpdater  extends AbstractUpdater {
         };
         final RunKeeperFitnessActivityFacet newFacet = apiDataService.createOrReadModifyWrite(RunKeeperFitnessActivityFacet.class, facetQuery, facetModifier, updateInfo.apiKey.getId());
         if (newFacet!=null) {
-            List<AbstractFacet> newFacets = new ArrayList<AbstractFacet>();
-            newFacets.add(newFacet);
-            bodyTrackStorageService.storeApiData(updateInfo.apiKey.getGuestId(), newFacets);
+            bodyTrackStorageService.storeApiData(updateInfo.apiKey, Arrays.asList(newFacet));
         }
     }
 

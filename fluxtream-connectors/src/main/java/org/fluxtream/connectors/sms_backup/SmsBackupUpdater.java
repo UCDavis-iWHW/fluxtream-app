@@ -19,6 +19,7 @@ import com.google.api.services.gmail.model.*;
 import com.google.api.services.gmail.model.Message;
 import org.apache.commons.codec.binary.Base64;
 import org.fluxtream.core.Configuration;
+import org.fluxtream.core.aspects.FlxLogger;
 import org.fluxtream.core.connectors.Connector;
 import org.fluxtream.core.connectors.ObjectType;
 import org.fluxtream.core.connectors.annotations.Updater;
@@ -57,11 +58,13 @@ import org.springframework.stereotype.Component;
 @Component
 @Updater(prettyName = "SMS_Backup", value = 6, objectTypes = {
 		CallLogEntryFacet.class, SmsEntryFacet.class }, settings=SmsBackupSettings.class,
-         defaultChannels = {"sms_backup.call_log"})
+         defaultChannels = {"SMS_Backup.call_log"})
 public class SmsBackupUpdater extends AbstractUpdater implements SettingsAwareUpdater {
 
     static final int baseSleepAmount = 500; //half a second
     static final int maxSleepAmount = 1000 * 60 * 60; //one hour
+
+    FlxLogger logger = FlxLogger.getLogger(SmsBackupUpdater.class);
 
     @Autowired
     BodyTrackHelper bodyTrackHelper;
@@ -92,59 +95,13 @@ public class SmsBackupUpdater extends AbstractUpdater implements SettingsAwareUp
         for (ObjectType type : updateInfo.objectTypes()){
             BigInteger historyId = getHistoryId(updateInfo, type);
             if (type.name().equals("call_log")){
-                List<ChannelMapping> mappings = bodyTrackHelper.getChannelMappings(updateInfo.apiKey);
-                boolean call_logChannelExists = false;
-                boolean photoChannelExists = false;
-                for (ChannelMapping mapping: mappings){
-                    if (mapping.deviceName.equals("sms_backup") && mapping.channelName.equals("call_log"))
-                        call_logChannelExists = true;
-                    if (mapping.deviceName.equals("sms_backup") && mapping.channelName.equals("photo"))
-                        photoChannelExists = true;
-                }
-                if (!call_logChannelExists){
-                    ChannelMapping mapping = new ChannelMapping();
-                    mapping.deviceName = "sms_backup";
-                    mapping.channelName = "call_log";
-                    mapping.timeType = ChannelMapping.TimeType.gmt;
-                    mapping.channelType = ChannelMapping.ChannelType.timespan;
-                    mapping.guestId = updateInfo.getGuestId();
-                    mapping.apiKeyId = updateInfo.apiKey.getId();
-                    mapping.objectTypeId = type.value();
-                    bodyTrackHelper.persistChannelMapping(mapping);
-
-                    ChannelStyle channelStyle = new ChannelStyle();
-                    channelStyle.timespanStyles = new MainTimespanStyle();
-                    channelStyle.timespanStyles.defaultStyle = new TimespanStyle();
-                    channelStyle.timespanStyles.defaultStyle.fillColor = "green";
-                    channelStyle.timespanStyles.defaultStyle.borderColor = "#006000";
-                    channelStyle.timespanStyles.defaultStyle.borderWidth = 2;
-                    channelStyle.timespanStyles.defaultStyle.top = 0.0;
-                    channelStyle.timespanStyles.defaultStyle.bottom = 1.0;
-
-                    bodyTrackHelper.setBuiltinDefaultStyle(updateInfo.getGuestId(),"sms_backup","call_log",channelStyle);
-
-                }
-                if (!photoChannelExists){
-                    ChannelMapping mapping;
-                    mapping = new ChannelMapping();
-                    mapping.deviceName = "sms_backup";
-                    mapping.channelName = "photo";
-                    mapping.timeType = ChannelMapping.TimeType.gmt;
-                    mapping.channelType = ChannelMapping.ChannelType.photo;
-                    mapping.guestId = updateInfo.getGuestId();
-                    mapping.apiKeyId = updateInfo.apiKey.getId();
-                    mapping.objectTypeId = ObjectType.getObjectType(updateInfo.apiKey.getConnector(),"sms").value();
-                    bodyTrackHelper.persistChannelMapping(mapping);
-                }
                 retrieveCallLogSinceDate(updateInfo, historyId);
             }
             else if (type.name().equals("sms")){
                 retrieveSmsEntriesSince(updateInfo, historyId);
-
             }
         }
 	}
-
 
     public BigInteger getHistoryId(UpdateInfo updateInfo, ObjectType ot){
         ApiKey apiKey = updateInfo.apiKey;
@@ -385,6 +342,9 @@ public class SmsBackupUpdater extends AbstractUpdater implements SettingsAwareUp
                                                                        facet.callType = CallLogEntryFacet.CallType.OUTGOING;
                                                                    } else if (callLine.indexOf("incoming call")!=-1) {
                                                                        facet.callType = CallLogEntryFacet.CallType.INCOMING;
+                                                                   } else {
+                                                                       logger.warn("SmsBackupUpdater: Unknown call type, callLine is \"" + callLine + "\"");
+                                                                       return null;
                                                                    }
                                                                    facet.personNumber = st.nextToken();
                                                                    switch(facet.callType) {
@@ -964,4 +924,18 @@ public class SmsBackupUpdater extends AbstractUpdater implements SettingsAwareUp
         return response;
 
     }
+
+    public void setDefaultChannelStyles(ApiKey apiKey) {
+        ChannelStyle channelStyle = new ChannelStyle();
+        channelStyle.timespanStyles = new MainTimespanStyle();
+        channelStyle.timespanStyles.defaultStyle = new TimespanStyle();
+        channelStyle.timespanStyles.defaultStyle.fillColor = "green";
+        channelStyle.timespanStyles.defaultStyle.borderColor = "#006000";
+        channelStyle.timespanStyles.defaultStyle.borderWidth = 2;
+        channelStyle.timespanStyles.defaultStyle.top = 0.0;
+        channelStyle.timespanStyles.defaultStyle.bottom = 1.0;
+
+        bodyTrackHelper.setBuiltinDefaultStyle(apiKey.getGuestId(), apiKey.getConnector().getName(), "data", channelStyle);
+    }
+
 }

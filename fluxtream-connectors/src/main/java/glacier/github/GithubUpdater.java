@@ -4,6 +4,7 @@ import org.fluxtream.core.connectors.Connector;
 import org.fluxtream.core.connectors.annotations.Updater;
 import org.fluxtream.core.connectors.updaters.AbstractUpdater;
 import org.fluxtream.core.connectors.updaters.UpdateInfo;
+import org.fluxtream.core.domain.ApiKey;
 import org.fluxtream.core.domain.ApiUpdate;
 import org.fluxtream.core.services.GuestService;
 import org.fluxtream.core.utils.HttpUtils;
@@ -31,7 +32,7 @@ public class GithubUpdater extends AbstractUpdater {
     @Override
     protected void updateConnectorDataHistory(final UpdateInfo updateInfo) throws Exception {
         if (!connectorUpdateService.isHistoryUpdateCompleted(updateInfo.apiKey, updateInfo.objectTypes)) {
-            apiDataService.eraseApiData(updateInfo.apiKey);
+            apiDataService.eraseApiData(updateInfo.apiKey, false);
         }
         loadHistory(updateInfo, 0, System.currentTimeMillis());
     }
@@ -62,5 +63,8 @@ public class GithubUpdater extends AbstractUpdater {
 
         countSuccessfulApiCall(updateInfo.apiKey, updateInfo.objectTypes, then, queryUrl);
     }
+
+    @Override
+    public void setDefaultChannelStyles(ApiKey apiKey) {}
 
 }

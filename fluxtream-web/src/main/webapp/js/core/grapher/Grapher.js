@@ -597,7 +597,7 @@ define(["core/grapher/BTCore","applications/calendar/tabs/list/ListUtils", "core
         var exportChannelMap = {};
         for (var element in this.channelsMap){
             var channel = this.channelsMap[element];
-            if (channel.type == null){//this signifies a data channel (aka we can export it!)
+            if (channel.type == "data"){//this signifies a data channel (aka we can export it!)
                 exportChannelMap[channel.device_name + "." + channel.channel_name] = element;
             }
         }
@@ -1230,9 +1230,7 @@ define(["core/grapher/BTCore","applications/calendar/tabs/list/ListUtils", "core
                     });
                 });
 
-                /* add event handler for the Show all Y range link */
-                $("#" + channelElementId + " #" + channelElementId + "_btnShowAllY").click(function(event) {
-                    event.preventDefault();
+                function showAllY() {
                     var plot = grapher.plotsMap[channelElementId];
                     if (!(plot && !!plot.getStatistics)) {
                         // Photo plots don't have a getStatistics method
@@ -1266,6 +1264,12 @@ define(["core/grapher/BTCore","applications/calendar/tabs/list/ListUtils", "core
                         || (!initialStats["data_pending"])) {
                         afterload(initialStats);
                     }
+                }
+
+                /* add event handler for the Show all Y range link */
+                $("#" + channelElementId + " #" + channelElementId + "_btnShowAllY").click(function(event) {
+                    event.preventDefault();
+                    showAllY();
                     // Else the getStatistics method will call afterload when
                     // the data arrives
 
@@ -1357,6 +1361,7 @@ define(["core/grapher/BTCore","applications/calendar/tabs/list/ListUtils", "core
                 // Create the fillColor colorpicker, and set its initial value
                 $("#" + channelElementId + "-config-comments-fillColor").colorPicker();
                 $("#" + channelElementId + "-config-comments-fillColor").change(updateDataSeriesPlotChannelConfig);
+                showAllY();
             } else if (plot instanceof PhotoSeriesPlot) {
 
                 $("#" + channelElementId + " #" + channelElementId + "_btnShowAllY").click(function(event){

@@ -23,6 +23,7 @@ import org.codehaus.jackson.type.TypeReference;
 public class GuestSettings extends AbstractEntity {
 
     public transient Configuration config;
+    public transient HashMap<String,String> topics;
 
 	public GuestSettings() {
 	}
@@ -56,6 +57,9 @@ public class GuestSettings extends AbstractEntity {
 
     @Lob
     public String messageDisplayCountersStorage;
+
+    @Lob
+    public String preferences;
 
     public void saveMessageDisplayCounters() {
         if (messageDisplayCounters==null) return;

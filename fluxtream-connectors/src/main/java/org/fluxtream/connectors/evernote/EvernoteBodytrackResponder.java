@@ -13,6 +13,7 @@ import org.fluxtream.core.connectors.bodytrackResponders.AbstractBodytrackRespon
 import org.fluxtream.core.connectors.vos.AbstractFacetVO;
 import org.fluxtream.core.domain.AbstractFacet;
 import org.fluxtream.core.domain.ApiKey;
+import org.fluxtream.core.domain.ChannelMapping;
 import org.fluxtream.core.domain.GuestSettings;
 import org.fluxtream.core.mvc.models.TimespanModel;
 import org.fluxtream.core.services.BuddiesService;
@@ -49,12 +50,13 @@ public class EvernoteBodytrackResponder extends AbstractBodytrackResponder {
         // 1/100th of the tile width, whichever is larger.
         long duration = Math.max((endMillis-startMillis)/100L, 60000*7L);
 
-
         for (AbstractFacet facet : facets){
             EvernoteNoteFacet note = (EvernoteNoteFacet) facet;
             if (connectorSettings!=null) {
                 final NotebookConfig notebookConfig = connectorSettings.getNotebook(note.notebookGuid);
                 if (notebookConfig!=null&&!notebookConfig.hidden)
+                    simpleMergeAddTimespan(items,new TimespanModel(note.start, note.start + duration, ((EvernoteNoteFacet)facet).notebookGuid, objectTypeName),startMillis,endMillis);
+                else if (notebookConfig==null)
                     simpleMergeAddTimespan(items,new TimespanModel(note.start, note.start + duration, ((EvernoteNoteFacet)facet).notebookGuid, objectTypeName),startMillis,endMillis);
             } else
                 simpleMergeAddTimespan(items,new TimespanModel(note.start, note.start + duration, ((EvernoteNoteFacet)facet).notebookGuid, objectTypeName),startMillis,endMillis);
@@ -89,4 +91,17 @@ public class EvernoteBodytrackResponder extends AbstractBodytrackResponder {
         List<AbstractFacetVO<AbstractFacet>> facetVOsForFacets = getFacetVOsForFacets(filteredFacets, timeInterval, guestSettings);
         return facetVOsForFacets;
     }
+
+    @Override
+    public void addToDeclaredChannelMappings(final ApiKey apiKey, final List<ChannelMapping> channelMappings) {
+        ChannelMapping sleepChannelMapping = new ChannelMapping(
+                apiKey.getId(), apiKey.getGuestId(),
+                ChannelMapping.ChannelType.timespan,
+                ChannelMapping.TimeType.gmt,
+                ObjectType.getObjectType(apiKey.getConnector(), "note").value(),
+                apiKey.getConnector().getDeviceNickname(), "notes",
+                apiKey.getConnector().getDeviceNickname(), "notes");
+        channelMappings.add(sleepChannelMapping);
+    }
+
 }

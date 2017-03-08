@@ -15,6 +15,12 @@
     <script src="/static/js/jquery.fastbutton-1.0.0.js"></script>
     <script src="static/js/bootstrap-3.2.0.min.js"></script>
     <script type="text/javascript" src="/${release}/js/welcome.js"></script>
+    <script>
+        if (typeof window.devicePixelRatio !="undefined"){
+            var retina = window.devicePixelRatio > 1;
+            setCookie("retina", retina?"1":"0", 30);
+        }
+    </script>
     <!-- fav icons -->
     <link rel="shortcut icon" href="favicon.ico">
 </head>
@@ -23,7 +29,8 @@
     <a href="javascript:void(0)">
         <h1 class="logo text-hide">Fluxtream</h1>
     </a>
-    <div class="xs-login visible-xs">
+    <a class="blog_link" href="http://blog.fluxtream.org/"><span>Blog</span></a>
+    <div class="xs-login visible-xs visible-sm">
         <button class="login_btn btn btn-primary form-control" onclick="enterCredentials()">Login</button>
     </div>
     <div class="login_container">
@@ -256,6 +263,7 @@
     </div>
 </footer>
 
+
 </div>
 
 <div class="modal fade" id="accessDeniedModal">
@@ -362,6 +370,7 @@
         </div>
     </div>
 </div>
+
 
 <div id="registerModalWrapper">
 </div>
